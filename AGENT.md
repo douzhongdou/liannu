@@ -37,7 +37,9 @@
 - 如果有依赖的其他任务（查看 dev-tasks.json 的 dependencies），它们的代码已经合并到了 dev，所以你现在的代码库是完整的
 
 **开发规范：**
-- 在 worktree 内开发（**不要**修改主仓库文件，除了 PROGRESS.md 通过 git -C）
+- 在 worktree 内开发（**不要**修改主仓库文件）
+- **AGENT.md**: 是 symlink，始终读取最新版本（Loop 统一管理）
+- **PROGRESS.md**: 本地是副本，编辑必须通过 `git -C ../../workflow` 操作主仓库
 - 创建隔离的 `data/` 目录存放实验数据
 - 遵循技术栈：React+Vite+TS+Tailwind
 - 如果要修改其他人写的文件，**必须保持向后兼容**
@@ -121,7 +123,15 @@ git push origin worker-X
 
 ### Phase 8: 标记完成（关键：必须在清理前执行）
 - 写入 `STATUS.txt`: `done:${TASK_ID}`
-- 沉淀经验到 `../PROGRESS.md`（使用 `git -C ../../workflow` 编辑主仓库）
+- 沉淀经验到 PROGRESS.md（**必须通过 git -C 操作主仓库**）：
+  ```bash
+  # 编辑主仓库的 PROGRESS.md
+  git -C ../../workflow checkout dev
+  # 编辑 ../../workflow/PROGRESS.md 文件
+  git -C ../../workflow add PROGRESS.md
+  git -C ../../workflow commit -m "docs: update progress for $TASK_ID"
+  git -C ../../workflow push origin dev
+  ```
 
 ### Phase 9: 清理
 - 由 ralph-loop 外部执行，Agent 无需处理
@@ -225,7 +235,7 @@ Loop → STATUS.txt (写入: idle)
 
 ## 七、禁止事项
 
-❌ 直接修改主仓库的 PROGRESS.md（必须使用 `git -C ../../workflow...` 方式）  
+❌ 直接编辑本地的 `PROGRESS.md`（必须使用 `git -C ../../workflow` 编辑主仓库）  
 ❌ 在 STATUS 标记为 done 前清理 worktree（会导致任务状态丢失）  
 ❌ 使用 any 类型（TypeScript 严格模式）  
 ❌ 留下 TODO 注释（必须完成或转为任务）  

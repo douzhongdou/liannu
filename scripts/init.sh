@@ -30,8 +30,11 @@ for i in {1..5}; do
         ln -sf "../workflow/dev-task.lock" .
         [ -f "../workflow/api-key.json" ] && ln -sf "../workflow/api-key.json" .
         
-        # 复制宪法
-        cp "../workflow/AGENT.md" .
+        # Symlink AGENT.md（所有 agent 实时读取最新规范）
+        ln -sf "../workflow/AGENT.md" .
+        
+        # 复制 PROGRESS.md（初始模板，agent 通过 git -C 编辑主仓库）
+        cp "../workflow/PROGRESS.md" .
         
         # 初始化状态
         echo "idle" > STATUS.txt
