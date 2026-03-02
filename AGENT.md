@@ -124,14 +124,26 @@ git push origin worker-X
 ### Phase 8: 标记完成（关键：必须在清理前执行）
 - 写入 `STATUS.txt`: `done:${TASK_ID}`
 - 沉淀经验到 PROGRESS.md（**必须通过 git -C 操作主仓库**）：
-  ```bash
-  # 编辑主仓库的 PROGRESS.md
-  git -C ../../workflow checkout dev
-  # 编辑 ../../workflow/PROGRESS.md 文件
-  git -C ../../workflow add PROGRESS.md
-  git -C ../../workflow commit -m "docs: update progress for $TASK_ID"
-  git -C ../../workflow push origin dev
-  ```
+  
+  **重要：PROGRESS.md 不在当前目录，必须通过 git -C 操作主仓库**
+  
+  步骤：
+  1. 确保在主仓库的 dev 分支：
+     ```bash
+     git -C ../../workflow checkout dev
+     git -C ../../workflow pull origin dev
+     ```
+  2. 编辑主仓库的 PROGRESS.md：
+     ```bash
+     # 使用 WriteFile 工具编辑 ../../workflow/PROGRESS.md
+     # 内容格式：- [$(date)] $TASK_ID: 学到的经验/解决的问题
+     ```
+  3. 提交到主仓库：
+     ```bash
+     git -C ../../workflow add PROGRESS.md
+     git -C ../../workflow commit -m "docs: update progress for $TASK_ID"
+     git -C ../../workflow push origin dev
+     ```
 
 ### Phase 9: 清理
 - 由 ralph-loop 外部执行，Agent 无需处理
