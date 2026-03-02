@@ -173,6 +173,26 @@ PY
         
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
         
+        # ===== 分配任务前：把 dev 最新代码同步到 worker 分支 =====
+        echo "[$(date '+%H:%M:%S')] Syncing dev -> worker-$WORKER_ID..."
+        cd "$PROJECT_ROOT"
+        
+        # 获取最新 dev
+        git fetch origin dev || true
+        
+        # 切换到 worker 分支
+        git checkout worker-$WORKER_ID 2>/dev/null || git checkout -b worker-$WORKER_ID
+        
+        # 把 dev 的最新代码合并到 worker 分支（确保 agent 在最新代码上开发）
+        if ! git merge --no-edit origin/dev -m "sync: merge dev before $TASK_ID"; then
+            echo "[$(date '+%H:%M:%S')] Warning: Merge dev to worker-$WORKER_ID failed, continuing anyway"
+            git merge --abort 2>/dev/null || true
+        fi
+        
+        # 推送 worker 分支（保存同步状态）
+        git push origin worker-$WORKER_ID || true
+        
+        # 更新 JSON 状态
         lock
         python3 << PY
 import json
@@ -182,6 +202,7 @@ for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'running'
         task['assigned_to'] = 'agent-w$WORKER_ID'
+        task['started_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
@@ -190,6 +211,9 @@ PY
         WORKER_DIR="$PROJECT_ROOT/../agent-w$WORKER_ID"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
         echo "busy:$TASK_ID" > "$STATUS_FILE"
+        
+        # 确保 worktree 中的代码是最新的
+        cd "$WORKER_DIR" && git pull origin worker-$WORKER_ID 2>/dev/null || true
         
         (
             cd "$WORKER_DIR"

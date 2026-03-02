@@ -30,9 +30,17 @@
 - 规划完成后立即执行，不要等待确认
 
 ### Phase 3: 开发
+
+**重要：你的 worktree 已经包含了 dev 分支的最新代码**
+- Loop 在分配任务前，已经将 dev 的最新代码合并到了你的 worker 分支
+- **你必须在现有代码基础上开发**，不要删除或覆盖其他人的工作
+- 如果有依赖的其他任务（查看 dev-tasks.json 的 dependencies），它们的代码已经合并到了 dev，所以你现在的代码库是完整的
+
+**开发规范：**
 - 在 worktree 内开发（**不要**修改主仓库文件，除了 PROGRESS.md 通过 git -C）
 - 创建隔离的 `data/` 目录存放实验数据
 - 遵循技术栈：React+Vite+TS+Tailwind
+- 如果要修改其他人写的文件，**必须保持向后兼容**
 
 ### Phase 4: 测试
 - 运行 `npm test` 或等效测试
@@ -57,7 +65,7 @@
 - [ ] 已对比 diff，确认只修改了必要文件
 - [ ] **自检**: "资深工程师会批准这个提交吗？"
 
-#### 提交命令（严格执行）
+#### 提交并推送命令（严格执行）
 ```bash
 # 1. 检查当前变更
 git status
@@ -68,6 +76,10 @@ git add .
 
 # 3. 提交（使用 Conventional Commits 格式）
 git commit -m "feat(task-${TASK_ID}): ${TASK_TITLE}"
+
+# 4. 【关键】推送到远程 worker 分支
+# Loop 会从这个分支获取代码并合并到 dev
+git push origin $(git branch --show-current)
 ```
 
 #### 提交规范
@@ -76,11 +88,20 @@ git commit -m "feat(task-${TASK_ID}): ${TASK_TITLE}"
 - **原子性**: 一个任务对应一个 commit，保持提交历史清晰
 - **信息**: 提交消息简洁明确（<50字），说明核心变更
 
-### Phase 7: 推送分支（让 Loop 合并到 dev）
+### Phase 7: Loop 自动合并到 dev（无需 Agent 操作）
 
-**重要：不要直接合并到 main，合并到 dev 分支由 Loop 处理**
+**Agent 无需操作，Loop 会自动处理：**
 
-Agent 完成开发后，只需推送自己的 worker 分支：
+1. Agent 推送 worker 分支后，标记任务完成
+2. Loop 检测到 `done:T1` 后，自动将 worker 分支合并到 dev
+3. 如果合并冲突，Loop 会标记任务为 error，需要人工介入
+
+**所以 Agent 只需要：**
+- 提交代码（`git commit`）
+- 推送到远程（`git push`）
+- 标记 STATUS.txt 为 done
+
+**不要直接操作 dev 或 main 分支！**
 
 ```bash
 # 1. 获取最新 dev 分支变更（预防冲突）
