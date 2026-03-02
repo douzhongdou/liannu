@@ -33,8 +33,8 @@ for i in {1..5}; do
         # Symlink AGENT.md（所有 agent 实时读取最新规范）
         ln -sf "../workflow/AGENT.md" .
         
-        # 复制 PROGRESS.md（初始模板，agent 通过 git -C 编辑主仓库）
-        cp "../workflow/PROGRESS.md" .
+        # NOTE: PROGRESS.md 不在 worktree 里
+        # Agent 必须通过 'git -C ../../workflow' 编辑主仓库的 PROGRESS.md
         
         # 初始化状态
         echo "idle" > STATUS.txt
