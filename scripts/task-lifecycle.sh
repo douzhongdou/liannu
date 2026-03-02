@@ -1,0 +1,121 @@
+#!/bin/bash
+# 任务生命周期管理工具
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+case "$1" in
+    "add")
+        # 添加新任务：./scripts/task-lifecycle.sh add "任务标题" "详细prompt"
+        TASK_ID="T$(date +%s)"
+        TITLE="$2"
+        PROMPT="$3"
+        
+        python3 << PYEOF
+import json
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+
+data['tasks'].append({
+    "id": "$TASK_ID",
+    "title": "$TITLE", 
+    "prompt": "$PROMPT",
+    "status": "pending",
+    "dependencies": [],
+    "assigned_to": None,
+    "worktree": None,
+    "plan_mode": False,
+    "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "started_at": None,
+    "completed_at": None,
+    "error_count": 0
+})
+
+with open('dev-tasks.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print(f"添加任务: $TASK_ID")
+PYEOF
+        ;;
+        
+    "reset")
+        # 重置所有任务为pending（重新开始）
+        python3 << 'PYEOF'
+import json
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+
+for t in data['tasks']:
+    t['status'] = 'pending'
+    t['assigned_to'] = None
+    t['worktree'] = None
+    t['started_at'] = None
+    t['completed_at'] = None
+    t['error_count'] = 0
+
+with open('dev-tasks.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print("所有任务已重置为pending")
+PYEOF
+        
+        # 重置所有worker状态
+        for i in {1..5}; do
+            if [ -f "../agent-w$i/STATUS.txt" ]; then
+                echo "idle" > "../agent-w$i/STATUS.txt"
+            fi
+        done
+        ;;
+        
+    "status")
+        # 查看状态
+        python3 << 'PYEOF'
+import json
+from datetime import datetime
+
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+
+print(f"{'ID':<8} {'Status':<10} {'Worker':<8} {'Title'}")
+print("-" * 60)
+for t in data['tasks']:
+    print(f"{t['id']:<8} {t['status']:<10} {str(t.get('assigned_to','')):<8} {t['title'][:30]}")
+PYEOF
+        ;;
+        
+    "retry")
+        # 重置失败/错误的任务为 pending，允许重试
+        python3 << 'PYEOF'
+import json
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+
+reset_count = 0
+for t in data['tasks']:
+    if t['status'] in ['error', 'failed']:
+        t['status'] = 'pending'
+        t['assigned_to'] = None
+        t['worktree'] = None
+        t['started_at'] = None
+        t['completed_at'] = None
+        reset_count += 1
+
+with open('dev-tasks.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print(f"已重置 {reset_count} 个失败任务为 pending")
+PYEOF
+        
+        # 重置所有 worker 状态
+        for i in {1..5}; do
+            if [ -f "../agent-w$i/STATUS.txt" ]; then
+                echo "idle" > "../agent-w$i/STATUS.txt"
+            fi
+        done
+        ;;
+        
+    *)
+        echo "用法: $0 {add|reset|retry|status}"
+        echo "  add \"标题\" \"prompt\"  - 添加任务"
+        echo "  reset               - 重置所有任务为 pending"
+        echo "  retry               - 重置失败任务为 pending，允许重试"
+        echo "  status              - 查看任务状态"
+        ;;
+esac
