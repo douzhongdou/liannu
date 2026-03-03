@@ -12,7 +12,9 @@
       "plan_mode": true,
       "started_at": null,
       "completed_at": null,
-      "error_count": 0
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
     },
     {
       "id": "T2",
@@ -25,7 +27,9 @@
       "plan_mode": true,
       "started_at": null,
       "completed_at": null,
-      "error_count": 0
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
     },
     {
       "id": "T3",
@@ -41,7 +45,9 @@
       "plan_mode": true,
       "started_at": null,
       "completed_at": null,
-      "error_count": 0
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
     }
   ]
 }
