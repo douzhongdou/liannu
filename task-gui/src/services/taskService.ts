@@ -46,7 +46,7 @@ export function getWorkerForTask(locks: TaskLockData, taskId: string): string | 
 
 export function sortTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
-    const statusOrder = { running: 0, pending: 1, failed: 2, completed: 3 };
+    const statusOrder = { running: 0, pending: 1, ready_to_integrate: 2, failed: 3, completed: 4 };
     return statusOrder[a.status] - statusOrder[b.status];
   });
 }

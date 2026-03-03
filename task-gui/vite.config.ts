@@ -45,7 +45,18 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), jsonFilePlugin],
   server: {
     port: 3000,
-    open: true
+    open: true,
+    // 确保热更新正常工作
+    hmr: {
+      enabled: true,
+      // 增加超时时间，避免WSL环境下的连接问题
+      timeout: 30000
+    },
+    // 增加文件监听的轮询间隔，解决Windows和WSL之间的文件系统问题
+    watch: {
+      usePolling: true,
+      interval: 100
+    }
   },
   // 配置别名，方便导入
   resolve: {

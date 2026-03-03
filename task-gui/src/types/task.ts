@@ -2,7 +2,7 @@ export interface Task {
   id: string;
   title: string;
   prompt: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'ready_to_integrate';
   dependencies: string[];
   assigned_to: string | null;
   worktree: string | null;
@@ -38,12 +38,14 @@ export const statusLabels: Record<TaskStatus, string> = {
   pending: '待处理',
   running: '进行中',
   completed: '已完成',
-  failed: '失败'
+  failed: '失败',
+  ready_to_integrate: '待集成'
 };
 
 export const statusColors: Record<TaskStatus, string> = {
   pending: 'bg-secondary-500',
   running: 'bg-primary-500',
   completed: 'bg-green-500',
-  failed: 'bg-red-500'
+  failed: 'bg-red-500',
+  ready_to_integrate: 'bg-blue-500'
 };

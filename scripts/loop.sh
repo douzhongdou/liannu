@@ -441,18 +441,10 @@ import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
 done_ids = {t['id'] for t in data['tasks'] if t['status'] == 'done'}
-def normalize(path):
-    value = (path or "").strip().replace("\\", "/").lower()
-    while value.startswith("./"):
-        value = value[2:]
-    value = value.strip("/")
-    return value
 for task in data['tasks']:
     if task['status'] == 'pending':
         if all(dep in done_ids for dep in task.get('dependencies', [])):
-            raw_paths = task.get('lock_paths') or []
-            paths = [normalize(p) for p in raw_paths if normalize(p)]
-            print(f"{task['id']}|{task['title']}|{';'.join(paths)}")
+            print(f"{task['id']}|{task['title']}")
 PY
 )
 
@@ -461,7 +453,7 @@ PY
         TASK_LINE=$(echo "$PENDING_TASKS" | sed -n "$((TASK_IDX+1))p" || true)
         [[ -z "$TASK_LINE" ]] && break
         
-        IFS='|' read -r TASK_ID TASK_TITLE TASK_LOCK_PATHS <<< "$TASK_LINE"
+        IFS='|' read -r TASK_ID TASK_TITLE <<< "$TASK_LINE"
         
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
         WORKER_DIR="$PROJECT_ROOT/../workers/w$WORKER_ID"
@@ -578,12 +570,11 @@ PY
         git -C "$WORKER_DIR" push --force-with-lease origin "$TASK_WORK_BRANCH" 2>/dev/null || true
         
         lock
-        python3 - "$TASK_ID" "$WORKER_ID" "$TASK_WORK_BRANCH" "$PLANNED_LOCK_PATHS" << 'PY'
+        python3 - "$TASK_ID" "$WORKER_ID" "$TASK_WORK_BRANCH" << 'PY'
 import json
 import sys
 
-task_id, worker_id, work_branch, lock_paths_raw = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-lock_paths = [p for p in lock_paths_raw.split(';') if p]
+task_id, worker_id, work_branch = sys.argv[1], sys.argv[2], sys.argv[3]
 with open('dev-tasks.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
@@ -594,7 +585,6 @@ for task in data.get('tasks', []):
         task['completed_at'] = None
         task['error_msg'] = None
         task['work_branch'] = work_branch
-        task['lock_paths'] = lock_paths
         break
 with open('dev-tasks.json', 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -655,7 +645,7 @@ PY
         
         TASK_IDX=$((TASK_IDX + 1))
         
-        while [[ $(pgrep -c kimi) -ge $MAX_WORKERS ]]; do sleep 2; done
+        while [[ $(pgrep -fc "kimi.*--session=w") -ge $MAX_WORKERS ]]; do sleep 2; done
         sleep 1
     done
 

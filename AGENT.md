@@ -203,7 +203,7 @@ Loop → dev-tasks.json (写入: status=done)
 Loop → STATUS.txt (写入: idle)
 ```
 
-**重要**: Worker 只读 dev-tasks.json，只写 STATUS.txt。不要直接修改 JSON！
+**重要**: Worker 只读 dev-tasks.json，不要直接修改 dev-tasks.json！
 
 ---
 

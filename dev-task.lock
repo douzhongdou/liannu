@@ -1,4 +1,15 @@
 {
   "version": "1.0",
-  "locks": []
+  "locks": [
+    {
+      "task_id": "T4",
+      "worker": "w1",
+      "paths": [
+        "src/lib/index.js",
+        "src/lib/index.test.js"
+      ],
+      "locked_at": "2026-03-03T12:40:49Z",
+      "heartbeat_at": "2026-03-03T12:40:49Z"
+    }
+  ]
 }
