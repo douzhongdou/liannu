@@ -1,46 +1,56 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import path from 'path'
+import { resolve } from 'path'
 import fs from 'fs'
+import type { ViteDevServer } from 'vite'
+import type { IncomingMessage, ServerResponse, NextFunction } from 'http'
+
+// 创建一个Vite插件来处理JSON文件请求
+const jsonFilePlugin = {
+  name: 'json-file-plugin',
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
+      if (req.url === '/dev-tasks.json') {
+        const filePath = resolve(__dirname, '..', 'dev-tasks.json');
+        fs.readFile(filePath, (err, data) => {
+          if (err) {
+            res.statusCode = 500;
+            res.end('Error reading dev-tasks.json');
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(data);
+        });
+      } else if (req.url === '/dev-task.lock') {
+        const filePath = resolve(__dirname, '..', 'dev-task.lock');
+        fs.readFile(filePath, (err, data) => {
+          if (err) {
+            res.statusCode = 500;
+            res.end('Error reading dev-task.lock');
+            return;
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(data);
+        });
+      } else {
+        next();
+      }
+    });
+  }
+};
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    {
-      name: 'api-middleware',
-      configureServer(server) {
-        server.middlewares.use('/api/tasks', (req, res, next) => {
-          try {
-            const data = fs.readFileSync(path.resolve(__dirname, '../dev-tasks.json'), 'utf-8')
-            res.setHeader('Content-Type', 'application/json')
-            res.end(data)
-          } catch (e) {
-            res.statusCode = 500
-            res.end(JSON.stringify({ error: 'Failed to read tasks file' }))
-          }
-        })
-        server.middlewares.use('/api/locks', (req, res, next) => {
-          try {
-            const data = fs.readFileSync(path.resolve(__dirname, '../dev-task.lock'), 'utf-8')
-            res.setHeader('Content-Type', 'application/json')
-            res.end(data)
-          } catch (e) {
-            res.statusCode = 404
-            res.end(JSON.stringify({ version: '1.0', locks: [] }))
-          }
-        })
-      },
-    },
-  ],
+  plugins: [react(), tailwindcss(), jsonFilePlugin],
   server: {
-    fs: {
-      allow: [
-        path.resolve(__dirname, '.'),
-        path.resolve(__dirname, '..'),
-      ],
-    },
+    port: 3000,
+    open: true
   },
+  // 配置别名，方便导入
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src')
+    }
+  }
 })

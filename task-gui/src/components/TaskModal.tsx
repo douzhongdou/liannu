@@ -11,7 +11,7 @@ export function TaskModal({ isOpen, onClose, onSubmit }: TaskModalProps) {
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [dependencies, setDependencies] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
+  const [assignedTo, setAssignedTo] = useState<string | null>(null);
   const [planMode, setPlanMode] = useState(false);
 
   if (!isOpen) return null;
@@ -22,7 +22,7 @@ export function TaskModal({ isOpen, onClose, onSubmit }: TaskModalProps) {
       title,
       prompt,
       dependencies: dependencies.split(',').map(d => d.trim()).filter(d => d),
-      assigned_to: assignedTo || null,
+      assigned_to: assignedTo === '' ? null : assignedTo,
       worktree: null,
       plan_mode: planMode,
       work_branch: null,
@@ -31,81 +31,81 @@ export function TaskModal({ isOpen, onClose, onSubmit }: TaskModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-gray-800 rounded-xl border border-gray-700 shadow-2xl">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">新建任务</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-lg bg-white dark:bg-secondary-800 rounded-2xl border border-secondary-200 dark:border-secondary-700 shadow-2xl animate-slide-up">
+        <div className="p-6 border-b border-secondary-200 dark:border-secondary-700">
+          <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100">新建任务</h2>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">标题</label>
+            <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">标题</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-3 bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-secondary-700 rounded-lg text-secondary-900 dark:text-secondary-100 placeholder-secondary-500 dark:placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
               placeholder="任务标题"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">描述</label>
+            <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">描述</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               required
               rows={4}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-4 py-3 bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-secondary-700 rounded-lg text-secondary-900 dark:text-secondary-100 placeholder-secondary-500 dark:placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 resize-none"
               placeholder="任务描述..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">依赖任务 (用逗号分隔)</label>
+            <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">依赖任务 (用逗号分隔)</label>
             <input
               type="text"
               value={dependencies}
               onChange={(e) => setDependencies(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-3 bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-secondary-700 rounded-lg text-secondary-900 dark:text-secondary-100 placeholder-secondary-500 dark:placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
               placeholder="T1, T2"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">执行者</label>
+            <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">执行者</label>
             <input
               type="text"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              value={assignedTo || ''}
+              onChange={(e) => setAssignedTo(e.target.value || null)}
+              className="w-full px-4 py-3 bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-secondary-700 rounded-lg text-secondary-900 dark:text-secondary-100 placeholder-secondary-500 dark:placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
               placeholder="w1, w2"
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
               id="planMode"
               checked={planMode}
               onChange={(e) => setPlanMode(e.target.checked)}
-              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-gray-900 border-gray-700"
+              className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 bg-white dark:bg-secondary-900 border-secondary-300 dark:border-secondary-600 transition-all duration-200"
             />
-            <label htmlFor="planMode" className="text-sm text-gray-400">Plan 模式</label>
+            <label htmlFor="planMode" className="text-sm text-secondary-700 dark:text-secondary-300">Plan 模式</label>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-4 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              className="flex-1 px-4 py-3 bg-white dark:bg-secondary-700 text-secondary-900 dark:text-secondary-100 border border-secondary-200 dark:border-secondary-600 rounded-lg hover:bg-secondary-50 dark:hover:bg-secondary-600 transition-all duration-200 font-medium"
             >
               取消
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              className="flex-1 px-4 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow-md"
             >
               创建
             </button>

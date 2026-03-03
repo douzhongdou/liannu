@@ -42,8 +42,8 @@ export const statusLabels: Record<TaskStatus, string> = {
 };
 
 export const statusColors: Record<TaskStatus, string> = {
-  pending: 'bg-gray-500',
-  running: 'bg-blue-500',
+  pending: 'bg-secondary-500',
+  running: 'bg-primary-500',
   completed: 'bg-green-500',
   failed: 'bg-red-500'
 };

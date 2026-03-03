@@ -119,20 +119,20 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-secondary-100 dark:bg-secondary-900">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <header className="border-b border-secondary-200 dark:border-secondary-800 bg-white/95 dark:bg-secondary-900/95 backdrop-blur sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-semibold text-secondary-900 dark:text-secondary-100 flex items-center gap-3">
+              <svg className="w-7 h-7 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
               </svg>
               Task GUI
             </h1>
             <button
               onClick={loadData}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-2.5 text-secondary-500 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg transition-all duration-200 hover:scale-105"
               title="刷新"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,16 +144,16 @@ function App() {
           <TaskStats tasks={tasks} />
 
           {/* View Tabs */}
-          <div className="flex items-center gap-2 mt-4 mb-4">
-            <div className="flex bg-gray-800 rounded-lg p-1">
+          <div className="flex flex-wrap items-center gap-4 mt-6 mb-6">
+            <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1">
               {(['task', 'agent'] as ViewMode[]).map(mode => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-5 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     viewMode === mode
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:text-gray-200'
+                      ? 'bg-primary-500 text-white shadow-sm'
+                      : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700'
                   }`}
                 >
                   {mode === 'task' ? '任务' : '执行者'}
@@ -162,17 +162,17 @@ function App() {
             </div>
 
             {viewMode === 'task' && (
-              <div className="flex items-center gap-2 ml-4">
-                <span className="text-sm text-gray-500">视图:</span>
-                <div className="flex bg-gray-800 rounded-lg p-1">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-secondary-600 dark:text-secondary-400">视图:</span>
+                <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1">
                   {(['card', 'table', 'kanban'] as TaskViewType[]).map(type => (
                     <button
                       key={type}
                       onClick={() => setTaskViewType(type)}
-                      className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                      className={`px-4 py-2 rounded-md text-sm transition-all duration-200 ${
                         taskViewType === type
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-400 hover:text-gray-200'
+                          ? 'bg-primary-500 text-white shadow-sm'
+                          : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700'
                       }`}
                     >
                       {type === 'card' ? '卡片' : type === 'table' ? '表格' : '看板'}
@@ -185,9 +185,9 @@ function App() {
             {viewMode === 'task' && (
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="ml-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="ml-auto px-5 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 transition-transform duration-300 hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 新建任务
@@ -196,27 +196,27 @@ function App() {
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             {viewMode === 'task' && (
               <>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {filterOptions.map(option => (
                     <button
                       key={option.value}
                       onClick={() => setFilterStatus(option.value)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      className={`px-4 py-2 text-sm rounded-lg transition-all duration-200 ${
                         filterStatus === option.value
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                          ? 'bg-primary-500 text-white shadow-sm'
+                          : 'bg-white dark:bg-secondary-800 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-700 border border-secondary-200 dark:border-secondary-700'
                       }`}
                     >
                       {option.label}
                     </button>
                   ))}
                 </div>
-                <div className="flex-1" />
-                <div className="relative">
-                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex-1 min-w-[200px]" />
+                <div className="relative w-full sm:w-auto max-w-md">
+                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
@@ -224,7 +224,7 @@ function App() {
                     placeholder="搜索任务..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-4 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 rounded-lg text-sm text-secondary-900 dark:text-secondary-100 placeholder-secondary-500 dark:placeholder-secondary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-300 hover:border-primary-300 dark:hover:border-primary-700"
                   />
                 </div>
               </>
@@ -234,48 +234,60 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {viewMode === 'task' ? (
-          <div className="space-y-4">
-            {taskViewType === 'card' && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">
-                  任务列表 ({filteredTasks.length})
-                </h2>
-                {filteredTasks.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <p>暂无任务</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Task List */}
+          <div className="lg:col-span-2">
+            {viewMode === 'task' ? (
+              <div className="space-y-6">
+                {taskViewType === 'card' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-medium text-secondary-900 dark:text-secondary-100">
+                        任务列表 ({filteredTasks.length})
+                      </h2>
+                    </div>
+                    {filteredTasks.length === 0 ? (
+                      <div className="text-center py-16 bg-white dark:bg-secondary-800 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in">
+                        <svg className="w-16 h-16 mx-auto mb-4 opacity-40 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <p className="text-secondary-500 dark:text-secondary-400">暂无任务</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredTasks.map(task => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            locks={locks}
+                            isSelected={task.id === selectedTaskId}
+                            onClick={() => setSelectedTaskId(task.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  filteredTasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      locks={locks}
-                      isSelected={task.id === selectedTaskId}
-                      onClick={() => setSelectedTaskId(task.id)}
-                    />
-                  ))
+                )}
+
+                {taskViewType === 'table' && (
+                  <TaskTable tasks={filteredTasks} locks={locks} onSelect={setSelectedTaskId} />
+                )}
+
+                {taskViewType === 'kanban' && (
+                  <TaskKanban tasks={filteredTasks} locks={locks} onSelect={setSelectedTaskId} />
                 )}
               </div>
-            )}
-
-            {taskViewType === 'table' && (
-              <TaskTable tasks={filteredTasks} locks={locks} onSelect={setSelectedTaskId} />
-            )}
-
-            {taskViewType === 'kanban' && (
-              <TaskKanban tasks={filteredTasks} locks={locks} onSelect={setSelectedTaskId} />
+            ) : (
+              <AgentList locks={locks} tasks={tasks} />
             )}
           </div>
-        ) : (
-          <AgentList locks={locks} tasks={tasks} />
-        )}
 
-        <TaskDetail task={selectedTask} locks={locks} />
+          {/* Task Detail */}
+          <div className="lg:col-span-1">
+            <TaskDetail task={selectedTask} locks={locks} />
+          </div>
+        </div>
       </main>
 
       <TaskModal

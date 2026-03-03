@@ -77,6 +77,78 @@ clean_worker_git_state() {
     git -C "$WORKER_DIR" checkout -- STATUS.txt 2>/dev/null || true
 }
 
+plan_task_lock_paths() {
+    local WORKER_DIR="$1"
+    local WORKER_ID="$2"
+    local TASK_ID="$3"
+    local TASK_TITLE="$4"
+    local TASK_PROMPT="$5"
+    local PLAN_OUTPUT=""
+    PLAN_OUTPUT=$(cd "$WORKER_DIR" && kimi --print --final-message-only --session="w$WORKER_ID" -p "You are planning file locks for task $TASK_ID: $TASK_TITLE.
+Return only JSON with this shape:
+{\"lock_paths\": [\"path/from/repo/root\"]}
+Rules:
+1) Output valid JSON only, no markdown.
+2) Use repo-relative paths.
+3) Include only files/directories you expect to modify.
+4) lock_paths must not be empty.
+
+Task detail:
+$TASK_PROMPT" 2>/dev/null || true)
+    printf '%s' "$PLAN_OUTPUT" | python3 << 'PY'
+import json
+import re
+import sys
+
+text = sys.stdin.read().strip()
+if not text:
+    sys.exit(1)
+
+def normalize(path: str) -> str:
+    value = (path or "").strip().replace("\\", "/").lower()
+    while value.startswith("./"):
+        value = value[2:]
+    value = value.strip("/")
+    return value
+
+def parse_obj(raw: str):
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        m = re.search(r"\{[\s\S]*\}", raw)
+        if not m:
+            return None
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            return None
+
+candidates = [text]
+candidates.extend(re.findall(r"```(?:json)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE))
+
+for candidate in candidates:
+    obj = parse_obj(candidate)
+    if not isinstance(obj, dict):
+        continue
+    paths = obj.get("lock_paths") or obj.get("paths") or []
+    if not isinstance(paths, list):
+        continue
+    normalized = []
+    for p in paths:
+        n = normalize(str(p))
+        if n and n not in normalized:
+            normalized.append(n)
+    if normalized:
+        print(";".join(normalized))
+        sys.exit(0)
+
+sys.exit(1)
+PY
+}
+
 init_lock_table() {
     python3 << PY
 import json
@@ -362,15 +434,6 @@ PY
         
         IFS='|' read -r TASK_ID TASK_TITLE TASK_LOCK_PATHS <<< "$TASK_LINE"
         
-        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "w$WORKER_ID" "$TASK_LOCK_PATHS" 2>/dev/null); then
-            if [[ -z "$CONFLICT_REASON" ]]; then
-                CONFLICT_REASON="CONFLICT:unknown"
-            fi
-            echo "[$(date '+%H:%M:%S')] Skip $TASK_ID for Worker $WORKER_ID, $CONFLICT_REASON"
-            TASK_IDX=$((TASK_IDX + 1))
-            continue
-        fi
-        
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
         WORKER_DIR="$PROJECT_ROOT/../workers/w$WORKER_ID"
         TASK_WORK_BRANCH="task/${TASK_ID}-w${WORKER_ID}"
@@ -414,29 +477,98 @@ PY
         if ! git -C "$WORKER_DIR" checkout -b "$TASK_WORK_BRANCH" "origin/$DEV_BRANCH" 2>/dev/null; then
             if ! git -C "$WORKER_DIR" checkout -b "$TASK_WORK_BRANCH"; then
                 echo "[$(date '+%H:%M:%S')] Warning: Create task branch $TASK_WORK_BRANCH failed, skip $TASK_ID"
-                release_task_lock "$TASK_ID"
                 TASK_IDX=$((TASK_IDX + 1))
                 continue
             fi
         fi
         
+        TASK_PROMPT=$(python3 - "$TASK_ID" << 'PY'
+import json
+import sys
+task_id = sys.argv[1]
+with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+for task in data.get('tasks', []):
+    if task.get('id') == task_id:
+        print(task.get('prompt', ''))
+        break
+PY
+)
+        PLANNED_LOCK_PATHS=""
+        if ! PLANNED_LOCK_PATHS=$(plan_task_lock_paths "$WORKER_DIR" "$WORKER_ID" "$TASK_ID" "$TASK_TITLE" "$TASK_PROMPT"); then
+            echo "[$(date '+%H:%M:%S')] Warning: Plan lock paths failed for $TASK_ID, skip assignment"
+            lock
+            python3 - "$TASK_ID" << 'PY'
+import json
+import sys
+task_id = sys.argv[1]
+with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+for task in data.get('tasks', []):
+    if task.get('id') == task_id:
+        task['status'] = 'pending'
+        task['assigned_to'] = None
+        task['started_at'] = None
+        task['error_msg'] = 'Plan lock paths failed'
+        break
+with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+            unlock
+            TASK_IDX=$((TASK_IDX + 1))
+            continue
+        fi
+        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "w$WORKER_ID" "$PLANNED_LOCK_PATHS" 2>/dev/null); then
+            if [[ -z "$CONFLICT_REASON" ]]; then
+                CONFLICT_REASON="CONFLICT:unknown"
+            fi
+            echo "[$(date '+%H:%M:%S')] Skip $TASK_ID for Worker $WORKER_ID, $CONFLICT_REASON"
+            lock
+            python3 - "$TASK_ID" "$CONFLICT_REASON" << 'PY'
+import json
+import sys
+task_id = sys.argv[1]
+reason = sys.argv[2]
+with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+for task in data.get('tasks', []):
+    if task.get('id') == task_id:
+        task['status'] = 'pending'
+        task['assigned_to'] = None
+        task['started_at'] = None
+        task['error_msg'] = reason
+        break
+with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+            unlock
+            TASK_IDX=$((TASK_IDX + 1))
+            continue
+        fi
+
         git -C "$WORKER_DIR" push --force-with-lease origin "$TASK_WORK_BRANCH" 2>/dev/null || true
         
         lock
-        python3 << PY
+        python3 - "$TASK_ID" "$WORKER_ID" "$TASK_WORK_BRANCH" "$PLANNED_LOCK_PATHS" << 'PY'
 import json
-with open('dev-tasks.json', 'r') as f:
+import sys
+
+task_id, worker_id, work_branch, lock_paths_raw = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+lock_paths = [p for p in lock_paths_raw.split(';') if p]
+with open('dev-tasks.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
-for task in data['tasks']:
-    if task['id'] == '$TASK_ID':
+for task in data.get('tasks', []):
+    if task.get('id') == task_id:
         task['status'] = 'running'
-        task['assigned_to'] = 'w$WORKER_ID'
+        task['assigned_to'] = f'w{worker_id}'
         task['started_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
         task['completed_at'] = None
         task['error_msg'] = None
-        task['work_branch'] = '$TASK_WORK_BRANCH'
-with open('dev-tasks.json', 'w') as f:
-    json.dump(data, f, indent=2)
+        task['work_branch'] = work_branch
+        task['lock_paths'] = lock_paths
+        break
+with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
 PY
         unlock
         

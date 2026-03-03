@@ -1,39 +1,36 @@
 import type { TaskData, TaskLockData, Task } from '../types/task';
 
-const TASKS_FILE = '/api/tasks';
-const LOCKS_FILE = '/api/locks';
-
 export async function fetchTasks(): Promise<TaskData> {
-  console.log('[TaskService] Fetching tasks from:', TASKS_FILE);
-  const response = await fetch(TASKS_FILE);
-  console.log('[TaskService] Response status:', response.status, response.statusText);
-  console.log('[TaskService] Response URL:', response.url);
-  console.log('[TaskService] Content-Type:', response.headers.get('content-type'));
-  
-  if (!response.ok) {
-    const text = await response.text();
-    console.error('[TaskService] Error response body:', text.substring(0, 200));
-    throw new Error(`Failed to fetch tasks: ${response.status} ${response.statusText}`);
+  console.log('[TaskService] Loading tasks from local file');
+  try {
+    // 使用fetch加载本地JSON文件
+    const response = await fetch('dev-tasks.json');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tasks: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('[TaskService] Tasks loaded:', data.tasks?.length || 0);
+    return data;
+  } catch (err) {
+    console.error('[TaskService] Error loading tasks:', err);
+    // 返回默认数据结构
+    return { version: '1.0', tasks: [] };
   }
-  
-  const data = await response.json();
-  console.log('[TaskService] Tasks loaded:', data.tasks?.length || 0);
-  return data;
 }
 
 export async function fetchLocks(): Promise<TaskLockData> {
-  console.log('[TaskService] Fetching locks from:', LOCKS_FILE);
+  console.log('[TaskService] Loading locks from local file');
   try {
-    const response = await fetch(LOCKS_FILE);
-    console.log('[TaskService] Locks response status:', response.status);
-    
+    // 使用fetch加载本地JSON文件
+    const response = await fetch('dev-task.lock');
     if (!response.ok) {
-      console.log('[TaskService] Locks file not found, returning empty');
-      return { version: '1.0', locks: [] };
+      throw new Error(`Failed to fetch locks: ${response.status}`);
     }
-    return response.json();
+    const data = await response.json();
+    console.log('[TaskService] Locks loaded:', data.locks?.length || 0);
+    return data;
   } catch (err) {
-    console.log('[TaskService] Locks fetch error:', err);
+    console.error('[TaskService] Error loading locks:', err);
     return { version: '1.0', locks: [] };
   }
 }

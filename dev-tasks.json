@@ -3,7 +3,7 @@
   "tasks": [
     {
       "id": "T1",
-      "title": "创建工具函数",
+      "title": "创建工具函数1",
       "prompt": "创建一个 src/utils.js 文件，内容很简单：\n1. 导出一个 add(a, b) 函数，返回两数之和\n2. 导出一个 greeting(name) 函数，返回 'Hello, {name}!'\n3. 创建简单的测试用例验证这两个函数\n完成后提交 git",
       "status": "pending",
       "dependencies": [],

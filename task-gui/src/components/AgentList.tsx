@@ -1,4 +1,5 @@
-import type { TaskLock, TaskLockData, Task } from '../types/task';
+import { useMemo } from 'react';
+import type { TaskLockData, Task } from '../types/task';
 
 interface Agent {
   worker: string;
