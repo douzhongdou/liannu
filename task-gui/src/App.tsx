@@ -122,8 +122,8 @@ function App() {
     <div className="min-h-screen bg-secondary-100 dark:bg-secondary-900">
       {/* Header */}
       <header className="border-b border-secondary-200 dark:border-secondary-800 bg-white/95 dark:bg-secondary-900/95 backdrop-blur sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center justify-between mb-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-semibold text-secondary-900 dark:text-secondary-100 flex items-center gap-3">
               <svg className="w-7 h-7 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -144,7 +144,7 @@ function App() {
           <TaskStats tasks={tasks} />
 
           {/* View Tabs */}
-          <div className="flex flex-wrap items-center gap-4 mt-6 mb-6">
+          <div className="flex flex-wrap items-center gap-4 mt-8 mb-8">
             <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1">
               {(['task', 'agent'] as ViewMode[]).map(mode => (
                 <button
@@ -185,7 +185,7 @@ function App() {
             {viewMode === 'task' && (
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="ml-auto px-5 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900"
+                className="ml-auto px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900 transform hover:scale-105 active:scale-95"
               >
                 <svg className="w-4 h-4 transition-transform duration-300 hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -234,28 +234,28 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Task List */}
           <div className="lg:col-span-2">
             {viewMode === 'task' ? (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {taskViewType === 'card' && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-lg font-medium text-secondary-900 dark:text-secondary-100">
                         任务列表 ({filteredTasks.length})
                       </h2>
                     </div>
                     {filteredTasks.length === 0 ? (
-                      <div className="text-center py-16 bg-white dark:bg-secondary-800 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in">
+                      <div className="text-center py-20 bg-white dark:bg-secondary-800 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in">
                         <svg className="w-16 h-16 mx-auto mb-4 opacity-40 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         <p className="text-secondary-500 dark:text-secondary-400">暂无任务</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {filteredTasks.map(task => (
                           <TaskCard
                             key={task.id}

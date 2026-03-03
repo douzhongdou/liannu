@@ -95,14 +95,15 @@ Rules:
 
 Task detail:
 $TASK_PROMPT" 2>/dev/null || true)
-    printf '%s' "$PLAN_OUTPUT" | python3 << 'PY'
+    PLAN_OUTPUT="$PLAN_OUTPUT" TASK_PROMPT="$TASK_PROMPT" TASK_TITLE="$TASK_TITLE" python3 << 'PY'
 import json
+import os
 import re
 import sys
 
-text = sys.stdin.read().strip()
-if not text:
-    sys.exit(1)
+text = (os.environ.get("PLAN_OUTPUT") or "").strip()
+task_prompt = (os.environ.get("TASK_PROMPT") or "").strip()
+task_title = (os.environ.get("TASK_TITLE") or "").strip()
 
 def normalize(path: str) -> str:
     value = (path or "").strip().replace("\\", "/").lower()
@@ -126,7 +127,9 @@ def parse_obj(raw: str):
         except Exception:
             return None
 
-candidates = [text]
+candidates = []
+if text:
+    candidates.append(text)
 candidates.extend(re.findall(r"```(?:json)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE))
 
 for candidate in candidates:
@@ -144,6 +147,25 @@ for candidate in candidates:
     if normalized:
         print(";".join(normalized))
         sys.exit(0)
+
+heuristic_paths = []
+raw_text = f"{task_title}\n{task_prompt}"
+for m in re.findall(r"(?i)(?:^|[\s`'\"(])((?:\./)?(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+)(?:$|[\s`'\"),])", raw_text):
+    n = normalize(m)
+    if n and n not in heuristic_paths:
+        heuristic_paths.append(n)
+for m in re.findall(r"(?i)(?:^|[\s`'\"(])((?:\./)?(?:[A-Za-z0-9_.-]+/)+)(?:$|[\s`'\"),])", raw_text):
+    n = normalize(m)
+    if n and n not in heuristic_paths:
+        heuristic_paths.append(n)
+for keyword in ("src", "test", "tests", "docs"):
+    if re.search(rf"(?i)\b{keyword}\b", raw_text):
+        n = normalize(keyword)
+        if n and n not in heuristic_paths:
+            heuristic_paths.append(n)
+if heuristic_paths:
+    print(";".join(heuristic_paths))
+    sys.exit(0)
 
 sys.exit(1)
 PY

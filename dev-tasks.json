@@ -3,38 +3,45 @@
   "tasks": [
     {
       "id": "T1",
-      "title": "创建工具函数1",
-      "prompt": "创建一个 src/utils.js 文件，内容很简单：\n1. 导出一个 add(a, b) 函数，返回两数之和\n2. 导出一个 greeting(name) 函数，返回 'Hello, {name}!'\n3. 创建简单的测试用例验证这两个函数\n完成后提交 git",
-      "status": "pending",
+      "title": "\u521b\u5efa\u5de5\u5177\u51fd\u65701",
+      "prompt": "\u521b\u5efa\u4e00\u4e2a src/utils.js \u6587\u4ef6\uff0c\u5185\u5bb9\u5f88\u7b80\u5355\uff1a\n1. \u5bfc\u51fa\u4e00\u4e2a add(a, b) \u51fd\u6570\uff0c\u8fd4\u56de\u4e24\u6570\u4e4b\u548c\n2. \u5bfc\u51fa\u4e00\u4e2a greeting(name) \u51fd\u6570\uff0c\u8fd4\u56de 'Hello, {name}!'\n3. \u521b\u5efa\u7b80\u5355\u7684\u6d4b\u8bd5\u7528\u4f8b\u9a8c\u8bc1\u8fd9\u4e24\u4e2a\u51fd\u6570\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "ready_to_integrate",
       "dependencies": [],
-      "assigned_to": null,
+      "assigned_to": "w1",
       "worktree": null,
       "plan_mode": true,
-      "started_at": null,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
       "completed_at": null,
       "error_count": 0,
       "error_msg": null,
-      "work_branch": null
+      "work_branch": "task/T1-w1",
+      "lock_paths": [
+        "src/utils.js",
+        "src/utils.test.js"
+      ]
     },
     {
       "id": "T2",
-      "title": "创建项目文档",
-      "prompt": "创建一个 README.md 文件，内容：\n1. 项目标题: Test Project\n2. 简单的功能列表（引用 T1 的 utils.js）\n3. 使用说明\n完成后提交 git",
-      "status": "pending",
+      "title": "\u521b\u5efa\u9879\u76ee\u6587\u6863",
+      "prompt": "\u521b\u5efa\u4e00\u4e2a README.md \u6587\u4ef6\uff0c\u5185\u5bb9\uff1a\n1. \u9879\u76ee\u6807\u9898: Test Project\n2. \u7b80\u5355\u7684\u529f\u80fd\u5217\u8868\uff08\u5f15\u7528 T1 \u7684 utils.js\uff09\n3. \u4f7f\u7528\u8bf4\u660e\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "running",
       "dependencies": [],
-      "assigned_to": null,
+      "assigned_to": "w2",
       "worktree": null,
       "plan_mode": true,
-      "started_at": null,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
       "completed_at": null,
       "error_count": 0,
       "error_msg": null,
-      "work_branch": null
+      "work_branch": "task/T2-w2",
+      "lock_paths": [
+        "readme.md"
+      ]
     },
     {
       "id": "T3",
-      "title": "整合并验证",
-      "prompt": "基于 T1 和 T2 的成果：\n1. 检查 utils.js 和 README.md 是否存在\n2. 创建一个 index.js 文件，引入 utils.js 并演示使用\n3. 确保所有文件都在 src/ 目录下\n4. 运行测试验证一切正常\n完成后提交 git，并更新 PROGRESS.md 记录完成情况",
+      "title": "\u6574\u5408\u5e76\u9a8c\u8bc1",
+      "prompt": "\u57fa\u4e8e T1 \u548c T2 \u7684\u6210\u679c\uff1a\n1. \u68c0\u67e5 utils.js \u548c README.md \u662f\u5426\u5b58\u5728\n2. \u521b\u5efa\u4e00\u4e2a index.js \u6587\u4ef6\uff0c\u5f15\u5165 utils.js \u5e76\u6f14\u793a\u4f7f\u7528\n3. \u786e\u4fdd\u6240\u6709\u6587\u4ef6\u90fd\u5728 src/ \u76ee\u5f55\u4e0b\n4. \u8fd0\u884c\u6d4b\u8bd5\u9a8c\u8bc1\u4e00\u5207\u6b63\u5e38\n\u5b8c\u6210\u540e\u63d0\u4ea4 git\uff0c\u5e76\u66f4\u65b0 PROGRESS.md \u8bb0\u5f55\u5b8c\u6210\u60c5\u51b5",
       "status": "pending",
       "dependencies": [
         "T1",
