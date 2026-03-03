@@ -9,7 +9,7 @@
       "dependencies": [],
       "assigned_to": null,
       "worktree": null,
-      "plan_mode": false,
+      "plan_mode": true,
       "started_at": null,
       "completed_at": null,
       "error_count": 0
@@ -22,7 +22,7 @@
       "dependencies": [],
       "assigned_to": null,
       "worktree": null,
-      "plan_mode": false,
+      "plan_mode": true,
       "started_at": null,
       "completed_at": null,
       "error_count": 0
@@ -32,10 +32,13 @@
       "title": "整合并验证",
       "prompt": "基于 T1 和 T2 的成果：\n1. 检查 utils.js 和 README.md 是否存在\n2. 创建一个 index.js 文件，引入 utils.js 并演示使用\n3. 确保所有文件都在 src/ 目录下\n4. 运行测试验证一切正常\n完成后提交 git，并更新 PROGRESS.md 记录完成情况",
       "status": "pending",
-      "dependencies": ["T1", "T2"],
+      "dependencies": [
+        "T1",
+        "T2"
+      ],
       "assigned_to": null,
       "worktree": null,
-      "plan_mode": false,
+      "plan_mode": true,
       "started_at": null,
       "completed_at": null,
       "error_count": 0

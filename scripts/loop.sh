@@ -161,8 +161,24 @@ PY
             if [[ "$STATUS" == "idle" && -z "$RUNNING_PID" ]]; then
                 IDLE_WORKERS+=("$i")
             elif [[ "$STATUS" == busy* && -z "$RUNNING_PID" ]]; then
-                echo "idle" > "$STATUS_FILE"
-                IDLE_WORKERS+=("$i")
+                # 检查状态文件修改时间，如果在30秒内被修改，可能是进程还没启动完成
+                # 使用 stat 命令获取修改时间（跨平台兼容）
+                if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+                    # Windows 环境
+                    FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$STATUS_FILE" 2>/dev/null || echo 0) ))
+                else
+                    # Linux/Mac 环境
+                    FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$STATUS_FILE" 2>/dev/null || echo 0) ))
+                fi
+                
+                if [[ $FILE_AGE -gt 30 ]]; then
+                    # 超过30秒没有进程，认为是僵尸状态，重置为idle
+                    echo "[$(date '+%H:%M:%S')] Worker $i busy but no process for ${FILE_AGE}s, resetting to idle"
+                    echo "idle" > "$STATUS_FILE"
+                    IDLE_WORKERS+=("$i")
+                else
+                    echo "[$(date '+%H:%M:%S')] Worker $i starting up (busy for ${FILE_AGE}s), waiting..."
+                fi
             fi
         fi
     done
