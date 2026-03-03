@@ -23,6 +23,22 @@ if ! command -v kimi &> /dev/null; then
     exit 1
 fi
 
+API_KEY_FILE="$PROJECT_ROOT/api-key.json"
+if [ -s "$API_KEY_FILE" ]; then
+    AUTH_SOURCE="api-key.json"
+else
+    AUTH_SOURCE="kimi login session"
+fi
+
+if ! kimi --print --final-message-only -p "auth check" >/dev/null 2>&1; then
+    echo "Error: Kimi authentication check failed."
+    echo "Tried auth source: $AUTH_SOURCE"
+    echo "Fix one of these and retry:"
+    echo "  1) Run: kimi login"
+    echo "  2) Or provide non-empty: $API_KEY_FILE"
+    exit 1
+fi
+
 echo "[$(date '+%H:%M:%S')] Ralph Loop started"
 
 LOCK_TABLE_FILE="$PROJECT_ROOT/dev-task.lock"
@@ -179,6 +195,9 @@ while true; do
     for i in $(seq 1 "$WORKER_COUNT"); do
         WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
+        if [[ -e "$WORKER_DIR/.git" && ! -f "$STATUS_FILE" ]]; then
+            echo "idle" > "$STATUS_FILE"
+        fi
         if [[ -f "$STATUS_FILE" ]]; then
             STATUS=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '[:space:]')
             TASK_ID=""
@@ -309,6 +328,9 @@ PY
     for i in $(seq 1 "$WORKER_COUNT"); do
         WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
+        if [[ -e "$WORKER_DIR/.git" && ! -f "$STATUS_FILE" ]]; then
+            echo "idle" > "$STATUS_FILE"
+        fi
         
         if [[ -f "$STATUS_FILE" ]]; then
             STATUS=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '[:space:]' || echo "unknown")
