@@ -13,35 +13,154 @@ fi
 
 echo "[$(date '+%H:%M:%S')] Ralph Loop started"
 
-LOCK_FILE="$PROJECT_ROOT/dev-task.lock"
+LOCK_TABLE_FILE="$PROJECT_ROOT/dev-task.lock"
+LOCK_GUARD_FILE="$PROJECT_ROOT/dev-task.lock.guard"
 
 cleanup() {
     echo "[$(date '+%H:%M:%S')] Stopping..."
     pkill -f "kimi.*agent-w" 2>/dev/null || true
-    rm -f "$LOCK_FILE" 2>/dev/null || true
+    rm -f "$LOCK_GUARD_FILE" 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGINT SIGTERM
 
-# 使用文件锁保护 dev-tasks.json
-# 所有 worker 通过 symlink 共享同一个 dev-task.lock 文件
 lock() {
     while true; do
-        # 尝试创建锁文件（原子操作）
-        if (set -C; echo $$ > "$LOCK_FILE") 2>/dev/null; then
-            # 成功获取锁
+        if (set -C; echo $$ > "$LOCK_GUARD_FILE") 2>/dev/null; then
             return 0
         fi
-        # 锁被占用，等待
         sleep 0.1
     done
 }
 
 unlock() {
-    rm -f "$LOCK_FILE" 2>/dev/null || true
+    rm -f "$LOCK_GUARD_FILE" 2>/dev/null || true
+}
+
+init_lock_table() {
+    python3 << PY
+import json
+import os
+
+path = r"$LOCK_TABLE_FILE"
+if not os.path.exists(path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"version": "1.0", "locks": []}, f, indent=2, ensure_ascii=False)
+PY
+}
+
+acquire_task_lock() {
+    local TASK_ID="$1"
+    local WORKER_NAME="$2"
+    local TASK_LOCK_PATHS="$3"
+    local RESULT=""
+
+    lock
+    RESULT=$(python3 - "$LOCK_TABLE_FILE" "$TASK_ID" "$WORKER_NAME" "$TASK_LOCK_PATHS" << 'PY'
+import json
+import os
+import sys
+from datetime import datetime
+
+lock_file, task_id, worker_name, raw_paths = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+def normalize(path: str) -> str:
+    value = (path or "").strip().replace("\\", "/").lower()
+    while value.startswith("./"):
+        value = value[2:]
+    value = value.strip("/")
+    return value
+
+if raw_paths:
+    paths = [normalize(p) for p in raw_paths.split(";") if normalize(p)]
+else:
+    paths = []
+
+if not paths:
+    paths = ["__global__"]
+
+if os.path.exists(lock_file):
+    with open(lock_file, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+    if content:
+        data = json.loads(content)
+    else:
+        data = {"version": "1.0", "locks": []}
+else:
+    data = {"version": "1.0", "locks": []}
+
+locks = data.get("locks", [])
+locks = [entry for entry in locks if entry.get("task_id") != task_id]
+
+request_set = set(paths)
+for entry in locks:
+    existing_set = set(entry.get("paths", []))
+    if "__global__" in existing_set or "__global__" in request_set:
+        print(f"CONFLICT:{entry.get('task_id','unknown')}")
+        raise SystemExit(2)
+    if request_set.intersection(existing_set):
+        print(f"CONFLICT:{entry.get('task_id','unknown')}")
+        raise SystemExit(2)
+
+now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+locks.append({
+    "task_id": task_id,
+    "worker": worker_name,
+    "paths": paths,
+    "locked_at": now,
+    "heartbeat_at": now
+})
+data["locks"] = locks
+
+with open(lock_file, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+
+print("ACQUIRED")
+PY
+)
+    local EXIT_CODE=$?
+    unlock
+
+    if [[ $EXIT_CODE -eq 0 ]]; then
+        return 0
+    fi
+
+    echo "$RESULT"
+    return 1
+}
+
+release_task_lock() {
+    local TASK_ID="$1"
+    lock
+    python3 - "$LOCK_TABLE_FILE" "$TASK_ID" << 'PY'
+import json
+import os
+import sys
+
+lock_file, task_id = sys.argv[1], sys.argv[2]
+
+if not os.path.exists(lock_file):
+    raise SystemExit(0)
+
+with open(lock_file, "r", encoding="utf-8") as f:
+    content = f.read().strip()
+
+if not content:
+    data = {"version": "1.0", "locks": []}
+else:
+    data = json.loads(content)
+
+locks = data.get("locks", [])
+data["locks"] = [entry for entry in locks if entry.get("task_id") != task_id]
+
+with open(lock_file, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+    unlock
 }
 
 MAX_WORKERS=3
+init_lock_table
 
 while true; do
     # ========== 同步 Worker 完成状态到 JSON ==========
@@ -63,7 +182,6 @@ while true; do
             if [[ "$STATUS" == done:T* ]]; then
                 echo "[$(date '+%H:%M:%S')] Sync $TASK_ID from Worker $i -> done"
                 
-                # 自动更新 dev-tasks.json（加锁保护）
                 lock
                 python3 << PY
 import json
@@ -78,31 +196,25 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                 unlock
+                release_task_lock "$TASK_ID"
                 
-                # ===== 将 Worker 分支合并到 dev =====
                 echo "[$(date '+%H:%M:%S')] Merging worker-$i to dev..."
                 cd "$PROJECT_ROOT"
                 
-                # 获取最新 dev 和 worker 分支
                 git fetch origin dev
                 git fetch origin worker-$i 2>/dev/null || true
                 
-                # 切换到 dev 分支
                 git checkout dev
                 
-                # 尝试合并 worker 分支
                 if git merge --no-edit origin/worker-$i -m "feat: merge worker-$i ($TASK_ID)"; then
-                    # 推送 dev 分支
                     if git push origin dev; then
                         echo "[$(date '+%H:%M:%S')] Successfully merged worker-$i to dev"
                     else
                         echo "[$(date '+%H:%M:%S')] Warning: Failed to push dev branch"
                     fi
                 else
-                    # 合并失败，回滚并标记错误
                     echo "[$(date '+%H:%M:%S')] ERROR: Merge conflict! Aborting merge."
                     git merge --abort 2>/dev/null || true
-                    # 标记任务为错误，需要人工介入
                     lock
                     python3 << PY
 import json
@@ -121,10 +233,8 @@ PY
                     continue
                 fi
                 
-                # 重置 Worker 为 idle，让它可以接新任务
                 echo "idle" > "$STATUS_FILE"
             elif [[ "$STATUS" == error:T* ]]; then
-                # 失败的任务增加 error_count并重置
                 echo "[$(date '+%H:%M:%S')] Worker $i error on $TASK_ID, incrementing error_count"
                 lock
                 python3 << PY
@@ -142,6 +252,7 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                 unlock
+                release_task_lock "$TASK_ID"
                 echo "idle" > "$STATUS_FILE"
             fi
         fi
@@ -161,18 +272,17 @@ PY
             if [[ "$STATUS" == "idle" && -z "$RUNNING_PID" ]]; then
                 IDLE_WORKERS+=("$i")
             elif [[ "$STATUS" == busy* && -z "$RUNNING_PID" ]]; then
-                # 检查状态文件修改时间，如果在30秒内被修改，可能是进程还没启动完成
-                # 使用 stat 命令获取修改时间（跨平台兼容）
                 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
-                    # Windows 环境
                     FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$STATUS_FILE" 2>/dev/null || echo 0) ))
                 else
-                    # Linux/Mac 环境
                     FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$STATUS_FILE" 2>/dev/null || echo 0) ))
                 fi
                 
                 if [[ $FILE_AGE -gt 30 ]]; then
-                    # 超过30秒没有进程，认为是僵尸状态，重置为idle
+                    BUSY_TASK_ID="${STATUS#busy:}"
+                    if [[ -n "$BUSY_TASK_ID" && "$BUSY_TASK_ID" != "$STATUS" ]]; then
+                        release_task_lock "$BUSY_TASK_ID"
+                    fi
                     echo "[$(date '+%H:%M:%S')] Worker $i busy but no process for ${FILE_AGE}s, resetting to idle"
                     echo "idle" > "$STATUS_FILE"
                     IDLE_WORKERS+=("$i")
@@ -183,49 +293,57 @@ PY
         fi
     done
 
-    # 找可执行任务
     PENDING_TASKS=$(python3 << 'PY'
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
 done_ids = {t['id'] for t in data['tasks'] if t['status'] == 'done'}
+def normalize(path):
+    value = (path or "").strip().replace("\\", "/").lower()
+    while value.startswith("./"):
+        value = value[2:]
+    value = value.strip("/")
+    return value
 for task in data['tasks']:
     if task['status'] == 'pending':
         if all(dep in done_ids for dep in task.get('dependencies', [])):
-            print(f"{task['id']}|{task['title']}")
+            raw_paths = task.get('lock_paths') or []
+            paths = [normalize(p) for p in raw_paths if normalize(p)]
+            print(f"{task['id']}|{task['title']}|{';'.join(paths)}")
 PY
 )
 
-    # 分配任务
     TASK_IDX=0
     for WORKER_ID in "${IDLE_WORKERS[@]}"; do
         TASK_LINE=$(echo "$PENDING_TASKS" | sed -n "$((TASK_IDX+1))p" || true)
         [[ -z "$TASK_LINE" ]] && break
         
-        IFS='|' read -r TASK_ID TASK_TITLE <<< "$TASK_LINE"
+        IFS='|' read -r TASK_ID TASK_TITLE TASK_LOCK_PATHS <<< "$TASK_LINE"
+        
+        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "agent-w$WORKER_ID" "$TASK_LOCK_PATHS" 2>/dev/null); then
+            if [[ -z "$CONFLICT_REASON" ]]; then
+                CONFLICT_REASON="CONFLICT:unknown"
+            fi
+            echo "[$(date '+%H:%M:%S')] Skip $TASK_ID for Worker $WORKER_ID, $CONFLICT_REASON"
+            TASK_IDX=$((TASK_IDX + 1))
+            continue
+        fi
         
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
-        
-        # ===== 分配任务前：把 dev 最新代码同步到 worker 分支 =====
         echo "[$(date '+%H:%M:%S')] Syncing dev -> worker-$WORKER_ID..."
         cd "$PROJECT_ROOT"
         
-        # 获取最新 dev
         git fetch origin dev || true
         
-        # 切换到 worker 分支
         git checkout worker-$WORKER_ID 2>/dev/null || git checkout -b worker-$WORKER_ID
         
-        # 把 dev 的最新代码合并到 worker 分支（确保 agent 在最新代码上开发）
         if ! git merge --no-edit origin/dev -m "sync: merge dev before $TASK_ID"; then
             echo "[$(date '+%H:%M:%S')] Warning: Merge dev to worker-$WORKER_ID failed, continuing anyway"
             git merge --abort 2>/dev/null || true
         fi
         
-        # 推送 worker 分支（保存同步状态）
         git push origin worker-$WORKER_ID || true
         
-        # 更新 JSON 状态
         lock
         python3 << PY
 import json
@@ -245,7 +363,6 @@ PY
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
         echo "busy:$TASK_ID" > "$STATUS_FILE"
         
-        # 确保 worktree 中的代码是最新的
         cd "$WORKER_DIR" && git pull origin worker-$WORKER_ID 2>/dev/null || true
         
         (
@@ -276,7 +393,6 @@ Do not skip the git commit step."; then
         sleep 1
     done
 
-    # 进度报告
     PROGRESS=$(python3 << 'PY'
 import json
 with open('dev-tasks.json', 'r') as f:

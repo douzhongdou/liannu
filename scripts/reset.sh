@@ -68,8 +68,14 @@ for i in {1..5}; do
     fi
 done
 
-# 6. 清理可能的锁文件
-rm -f "$PROJECT_ROOT/dev-task.lock"
+# 6. 重置锁表
+cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+{
+  "version": "1.0",
+  "locks": []
+}
+EOF
+rm -f "$PROJECT_ROOT/dev-task.lock.guard"
 
 echo ""
 echo "========================================="

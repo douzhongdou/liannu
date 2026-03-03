@@ -7,10 +7,15 @@ cd "$PROJECT_ROOT"
 
 echo "🚀 初始化 Ralph Loop 架构..."
 
-# 确保锁文件存在（空文件即可，用于 symlink）
+# 确保锁文件存在（文件占用表）
 if [ ! -f "$PROJECT_ROOT/dev-task.lock" ]; then
-    touch "$PROJECT_ROOT/dev-task.lock"
-    echo "✅ 创建锁文件: dev-task.lock"
+    cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+{
+  "version": "1.0",
+  "locks": []
+}
+EOF
+    echo "✅ 创建锁表: dev-task.lock"
 fi
 
 # 创建5个同级 Worktree（在主仓库同级目录）
