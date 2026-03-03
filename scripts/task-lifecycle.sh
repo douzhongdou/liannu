@@ -75,8 +75,8 @@ EOF
         
         # 重置所有worker状态
         for i in {1..5}; do
-            if [ -f "../agent-w$i/STATUS.txt" ]; then
-                echo "idle" > "../agent-w$i/STATUS.txt"
+            if [ -f "../workers/w$i/STATUS.txt" ]; then
+                echo "idle" > "../workers/w$i/STATUS.txt"
             fi
         done
         ;;
@@ -129,8 +129,8 @@ EOF
         
         # 重置所有 worker 状态
         for i in {1..5}; do
-            if [ -f "../agent-w$i/STATUS.txt" ]; then
-                echo "idle" > "../agent-w$i/STATUS.txt"
+            if [ -f "../workers/w$i/STATUS.txt" ]; then
+                echo "idle" > "../workers/w$i/STATUS.txt"
             fi
         done
         ;;

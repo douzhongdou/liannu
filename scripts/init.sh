@@ -1,68 +1,104 @@
 #!/bin/bash
-# scripts/init.sh
 
 set -e
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$PROJECT_ROOT"
 
-echo "🚀 初始化 Ralph Loop 架构..."
+WORKFLOW_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKSPACE_ROOT="$(cd "$WORKFLOW_ROOT/.." && pwd)"
+PROJECT_REPO="$WORKSPACE_ROOT/project"
+WORKERS_ROOT="$WORKSPACE_ROOT/workers"
+CONFIG_FILE="${WORKFLOW_CONFIG_FILE:-$WORKFLOW_ROOT/config/workflow.env}"
 
-# 确保锁文件存在（文件占用表）
-if [ ! -f "$PROJECT_ROOT/dev-task.lock" ]; then
-    cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+if [ -f "$CONFIG_FILE" ]; then
+    set -a
+    . "$CONFIG_FILE"
+    set +a
+fi
+
+WORKFLOW_REMOTE="${WORKFLOW_REMOTE:-}"
+PROJECT_REMOTE="${PROJECT_REMOTE:-}"
+PROJECT_MAIN_BRANCH="${PROJECT_MAIN_BRANCH:-main}"
+WORKER_COUNT="${WORKER_COUNT:-5}"
+
+mkdir -p "$WORKFLOW_ROOT/tasks" "$WORKFLOW_ROOT/state" "$WORKFLOW_ROOT/logs" "$WORKFLOW_ROOT/runtime"
+mkdir -p "$WORKERS_ROOT"
+
+if [ ! -f "$WORKFLOW_ROOT/dev-task.lock" ]; then
+cat > "$WORKFLOW_ROOT/dev-task.lock" << 'EOF'
 {
   "version": "1.0",
   "locks": []
 }
 EOF
-    echo "✅ 创建锁表: dev-task.lock"
 fi
 
-# 创建5个同级 Worktree（在主仓库同级目录）
-for i in {1..5}; do
-    WORKTREE_NAME="agent-w$i"
-    WORKTREE_PATH="../$WORKTREE_NAME"  # 关键：放到父目录
-    BRANCH="worker-$i"
-    
-    if [ ! -d "$WORKTREE_PATH" ]; then
-        # 创建分支
-        git branch "$BRANCH" 2>/dev/null || true
-        
-        # 创建 Worktree（在父目录）
-        git worktree add "$WORKTREE_PATH" "$BRANCH"
-        
-        cd "$WORKTREE_PATH"
-        
-        # 创建隔离数据目录
-        mkdir -p data
-        
-        # Symlink 共享文件（指向主仓库）
-        ln -sf "../workflow/dev-tasks.json" .
-        ln -sf "../workflow/dev-task.lock" .
-        [ -f "../workflow/api-key.json" ] && ln -sf "../workflow/api-key.json" .
-        
-        # Symlink AGENT.md（所有 agent 实时读取最新规范）
-        ln -sf "../workflow/AGENT.md" .
-        
-        # NOTE: PROGRESS.md 不在 worktree 里
-        # Agent 必须通过 'git -C ../../workflow' 编辑主仓库的 PROGRESS.md
-        
-        # 初始化状态
-        echo "idle" > STATUS.txt
-        
-        # Git 配置
-        git config user.email "worker-$i@ralph.loop"
-        git config user.name "Worker $i"
-        
-        cd "$PROJECT_ROOT"
-        
-        echo "✅ Worker-$i 就绪 -> $WORKTREE_PATH"
+if [ ! -f "$WORKFLOW_ROOT/dev-tasks.json" ]; then
+cat > "$WORKFLOW_ROOT/dev-tasks.json" << 'EOF'
+{
+  "version": "1.0",
+  "tasks": []
+}
+EOF
+fi
+
+if [ -n "$WORKFLOW_REMOTE" ]; then
+    CURRENT_WORKFLOW_REMOTE="$(git -C "$WORKFLOW_ROOT" remote get-url origin 2>/dev/null || true)"
+    if [ -z "$CURRENT_WORKFLOW_REMOTE" ]; then
+        git -C "$WORKFLOW_ROOT" remote add origin "$WORKFLOW_REMOTE"
+    elif [ "$CURRENT_WORKFLOW_REMOTE" != "$WORKFLOW_REMOTE" ]; then
+        git -C "$WORKFLOW_ROOT" remote set-url origin "$WORKFLOW_REMOTE"
     fi
+fi
+
+if [ ! -d "$PROJECT_REPO/.git" ]; then
+    SOURCE_REMOTE="$PROJECT_REMOTE"
+    if [ -z "$SOURCE_REMOTE" ]; then
+        SOURCE_REMOTE="$(git -C "$WORKFLOW_ROOT" remote get-url origin 2>/dev/null || true)"
+    fi
+    if [ -n "$SOURCE_REMOTE" ]; then
+        git clone "$SOURCE_REMOTE" "$PROJECT_REPO"
+    else
+        git clone "$WORKFLOW_ROOT" "$PROJECT_REPO"
+    fi
+fi
+
+if [ -n "$PROJECT_REMOTE" ]; then
+    CURRENT_PROJECT_REMOTE="$(git -C "$PROJECT_REPO" remote get-url origin 2>/dev/null || true)"
+    if [ -z "$CURRENT_PROJECT_REMOTE" ]; then
+        git -C "$PROJECT_REPO" remote add origin "$PROJECT_REMOTE"
+    elif [ "$CURRENT_PROJECT_REMOTE" != "$PROJECT_REMOTE" ]; then
+        git -C "$PROJECT_REPO" remote set-url origin "$PROJECT_REMOTE"
+    fi
+fi
+
+for i in $(seq 1 "$WORKER_COUNT"); do
+    WORKER_BRANCH="worker-$i"
+    WORKER_DIR="$WORKERS_ROOT/w$i"
+
+    git -C "$PROJECT_REPO" fetch origin "$PROJECT_MAIN_BRANCH" >/dev/null 2>&1 || true
+    git -C "$PROJECT_REPO" show-ref --verify --quiet "refs/heads/$WORKER_BRANCH" || \
+        git -C "$PROJECT_REPO" branch "$WORKER_BRANCH" "origin/$PROJECT_MAIN_BRANCH" 2>/dev/null || \
+        git -C "$PROJECT_REPO" branch "$WORKER_BRANCH"
+
+    if [ ! -e "$WORKER_DIR/.git" ]; then
+        git -C "$PROJECT_REPO" worktree add "$WORKER_DIR" "$WORKER_BRANCH"
+    fi
+
+    ln -sf "../../workflow/dev-tasks.json" "$WORKER_DIR/dev-tasks.json"
+    ln -sf "../../workflow/dev-task.lock" "$WORKER_DIR/dev-task.lock"
+    [ -f "$WORKFLOW_ROOT/api-key.json" ] && ln -sf "../../workflow/api-key.json" "$WORKER_DIR/api-key.json"
+    ln -sf "../../workflow/AGENT.md" "$WORKER_DIR/AGENT.md"
+
+    mkdir -p "$WORKER_DIR/data"
+    echo "idle" > "$WORKER_DIR/STATUS.txt"
+
+    git -C "$WORKER_DIR" config user.email "worker-$i@ralph.loop"
+    git -C "$WORKER_DIR" config user.name "Worker $i"
 done
 
-echo ""
-echo "目录结构："
-echo "  主仓库: $(pwd)"
-echo "  Agents: $(cd .. && pwd)/agent-w1 ... agent-w5"
-echo ""
-echo "启动: ./scripts/loop.sh"
+echo "✅ 初始化完成"
+echo "workflow: $WORKFLOW_ROOT"
+echo "project : $PROJECT_REPO"
+echo "workflow remote: ${WORKFLOW_REMOTE:-<empty>}"
+echo "project remote : ${PROJECT_REMOTE:-<empty>}"
+echo "main branch    : $PROJECT_MAIN_BRANCH"
+echo "workers : $WORKERS_ROOT/w1 ... w$WORKER_COUNT"

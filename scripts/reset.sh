@@ -2,36 +2,71 @@
 # scripts/reset-all.sh - 重置所有分支和任务状态
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$PROJECT_ROOT"
+CONFIG_FILE="${WORKFLOW_CONFIG_FILE:-$PROJECT_ROOT/config/workflow.env}"
+
+if [ -f "$CONFIG_FILE" ]; then
+    set -a
+    . "$CONFIG_FILE"
+    set +a
+fi
+
+PROJECT_MAIN_BRANCH="${PROJECT_MAIN_BRANCH:-main}"
+PROJECT_REPO="${PROJECT_REPO:-$PROJECT_ROOT/../project}"
+DEV_BRANCH="${DEV_BRANCH:-$PROJECT_MAIN_BRANCH}"
+WORKER_COUNT="${WORKER_COUNT:-5}"
 
 echo "========================================="
 echo "      重置所有分支和任务状态"
 echo "========================================="
 echo ""
 
-# 1. 获取最新的 main 分支
-echo "[1/4] 获取 main 分支最新状态..."
-git fetch origin main
+if ! git -C "$PROJECT_REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "ERROR: 无效项目仓库路径: $PROJECT_REPO"
+    exit 1
+fi
 
-# 2. 重置所有远程分支为 main
-echo "[2/4] 重置远程分支为 main..."
-for branch in dev worker-1 worker-2 worker-3 worker-4 worker-5; do
+echo "[1/6] 获取项目仓库最新状态..."
+git -C "$PROJECT_REPO" fetch origin "$PROJECT_MAIN_BRANCH"
+git -C "$PROJECT_REPO" fetch origin "$DEV_BRANCH" 2>/dev/null || true
+
+echo "[2/6] 重置项目远程分支..."
+if [[ "$DEV_BRANCH" != "$PROJECT_MAIN_BRANCH" ]]; then
+    for branch in "$DEV_BRANCH"; do
+        echo "  - 重置 $branch 分支..."
+        git -C "$PROJECT_REPO" push origin "origin/$PROJECT_MAIN_BRANCH:$branch" --force 2>/dev/null || echo "    (分支 $branch 可能不存在，跳过)"
+    done
+fi
+for i in $(seq 1 "$WORKER_COUNT"); do
+    branch="worker-$i"
     echo "  - 重置 $branch 分支..."
-    git push origin origin/main:$branch --force 2>/dev/null || echo "    (分支 $branch 可能不存在，跳过)"
+    git -C "$PROJECT_REPO" push origin "origin/$PROJECT_MAIN_BRANCH:$branch" --force 2>/dev/null || echo "    (分支 $branch 可能不存在，跳过)"
 done
 
-# 3. 重置本地分支
-echo "[3/4] 重置本地分支..."
-git checkout main 2>/dev/null || git checkout -b main origin/main
+echo "[3/6] 重置项目本地分支和工作区..."
+git -C "$PROJECT_REPO" checkout "$PROJECT_MAIN_BRANCH" 2>/dev/null || git -C "$PROJECT_REPO" checkout -b "$PROJECT_MAIN_BRANCH" "origin/$PROJECT_MAIN_BRANCH"
+git -C "$PROJECT_REPO" reset --hard "origin/$PROJECT_MAIN_BRANCH" 2>/dev/null || true
+git -C "$PROJECT_REPO" clean -fd
 
-# 删除本地 worker 分支
-for i in {1..5}; do
-    git branch -D worker-$i 2>/dev/null || true
+for i in $(seq 1 "$WORKER_COUNT"); do
+    git -C "$PROJECT_REPO" branch -D worker-$i 2>/dev/null || true
 done
-git branch -D dev 2>/dev/null || true
+if [[ "$DEV_BRANCH" != "$PROJECT_MAIN_BRANCH" ]]; then
+    git -C "$PROJECT_REPO" branch -D "$DEV_BRANCH" 2>/dev/null || true
+fi
 
-# 4. 重置 dev-tasks.json 任务状态
-echo "[4/4] 重置任务状态..."
+echo "[4/6] 重置 worker 工作树代码..."
+for i in $(seq 1 "$WORKER_COUNT"); do
+    WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
+    if [[ -e "$WORKER_DIR/.git" ]]; then
+        git -C "$WORKER_DIR" fetch origin "worker-$i" 2>/dev/null || true
+        git -C "$WORKER_DIR" checkout "worker-$i" 2>/dev/null || true
+        git -C "$WORKER_DIR" reset --hard "origin/worker-$i" 2>/dev/null || git -C "$WORKER_DIR" reset --hard "origin/$PROJECT_MAIN_BRANCH" 2>/dev/null || true
+        git -C "$WORKER_DIR" clean -fd
+    fi
+done
+
+echo "[5/6] 重置任务状态..."
+cd "$PROJECT_ROOT"
 python3 << 'PYEOF'
 import json
 from datetime import datetime
@@ -58,17 +93,16 @@ except Exception as e:
     print(f"  ✗ 重置失败: {e}")
 PYEOF
 
-# 5. 重置所有 worker 的 STATUS.txt
 echo "[额外] 重置 Worker 状态..."
-for i in {1..5}; do
-    WORKER_DIR="$PROJECT_ROOT/../agent-w$i"
+for i in $(seq 1 "$WORKER_COUNT"); do
+    WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
     if [[ -f "$WORKER_DIR/STATUS.txt" ]]; then
         echo "idle" > "$WORKER_DIR/STATUS.txt"
-        echo "  ✓ agent-w$i 已重置为 idle"
+        echo "  ✓ w$i 已重置为 idle"
     fi
 done
 
-# 6. 重置锁表
+echo "[6/6] 重置锁表..."
 cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
 {
   "version": "1.0",
@@ -83,7 +117,7 @@ echo "           重置完成！"
 echo "========================================="
 echo ""
 echo "当前状态:"
-echo "  - 所有分支已重置为 main"
+echo "  - 项目仓库分支已重置为 $PROJECT_MAIN_BRANCH"
 echo "  - 所有任务状态已重置为 pending"
 echo "  - 所有 worker 已重置为 idle"
 echo ""

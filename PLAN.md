@@ -6,7 +6,7 @@
 ## 技术选型
 - **调度器**: Bash + Python (轻量，无需额外依赖)
 - **状态存储**: JSON 文件 (dev-tasks.json) + 文本文件 (STATUS.txt)
-- **并发控制**: 文件锁 (mkdir .lock)
+- **并发控制**: 文件锁 (dev-task.lock)
 - **Worker 隔离**: Git Worktree (独立工作目录)
 - **通信机制**: Symlink + 文件轮询
 - **Web GUI**: Python + Flask + 原生 HTML/JS

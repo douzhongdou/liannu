@@ -3,6 +3,15 @@
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
+CONFIG_FILE="${WORKFLOW_CONFIG_FILE:-$PROJECT_ROOT/config/workflow.env}"
+
+if [ -f "$CONFIG_FILE" ]; then
+    set -a
+    . "$CONFIG_FILE"
+    set +a
+fi
+
+WORKER_COUNT="${WORKER_COUNT:-5}"
 
 echo "========================================="
 echo "          Ralph Loop Worker 状态         "
@@ -31,12 +40,12 @@ echo ""
 # 显示每个 Worker 状态
 echo "👷 Worker 状态:"
 echo "-----------------------------------------"
-for i in {1..5}; do
-    STATUS_FILE="../agent-w$i/STATUS.txt"
+for i in $(seq 1 "$WORKER_COUNT"); do
+    STATUS_FILE="../workers/w$i/STATUS.txt"
     if [[ -f "$STATUS_FILE" ]]; then
         STATUS=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '[:space:]')
         # 检查是否有运行中的 kimi 进程
-        RUNNING_PID=$(pgrep -f "kimi.*agent-w$i" | head -1 || true)
+        RUNNING_PID=$(pgrep -f "kimi.*--session=w$i" | head -1 || true)
         if [[ -n "$RUNNING_PID" ]]; then
             PROC_STATUS="🟢 (PID: $RUNNING_PID)"
         else
@@ -52,9 +61,9 @@ for i in {1..5}; do
             *) ICON="⚪" ;;
         esac
         
-        printf "   %s agent-w%-2s: %-12s %s\n" "$ICON" "$i" "$STATUS" "$PROC_STATUS"
+        printf "   %s w%-8s: %-12s %s\n" "$ICON" "$i" "$STATUS" "$PROC_STATUS"
     else
-        echo "   ⚠️  agent-w$i: 未初始化"
+        echo "   ⚠️  w$i: 未初始化"
     fi
 done
 echo ""

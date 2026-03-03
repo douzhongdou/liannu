@@ -3,6 +3,18 @@
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 mkdir -p logs
+CONFIG_FILE="${WORKFLOW_CONFIG_FILE:-$PROJECT_ROOT/config/workflow.env}"
+
+if [ -f "$CONFIG_FILE" ]; then
+    set -a
+    . "$CONFIG_FILE"
+    set +a
+fi
+
+WORKER_COUNT="${WORKER_COUNT:-5}"
+PROJECT_REPO="${PROJECT_REPO:-$PROJECT_ROOT/../project}"
+PROJECT_MAIN_BRANCH="${PROJECT_MAIN_BRANCH:-main}"
+DEV_BRANCH="${DEV_BRANCH:-$PROJECT_MAIN_BRANCH}"
 
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -18,7 +30,7 @@ LOCK_GUARD_FILE="$PROJECT_ROOT/dev-task.lock.guard"
 
 cleanup() {
     echo "[$(date '+%H:%M:%S')] Stopping..."
-    pkill -f "kimi.*agent-w" 2>/dev/null || true
+    pkill -f "kimi.*--session=w" 2>/dev/null || true
     rm -f "$LOCK_GUARD_FILE" 2>/dev/null || true
     exit 0
 }
@@ -164,8 +176,8 @@ init_lock_table
 
 while true; do
     # ========== 同步 Worker 完成状态到 JSON ==========
-    for i in {1..5}; do
-        WORKER_DIR="$PROJECT_ROOT/../agent-w$i"
+    for i in $(seq 1 "$WORKER_COUNT"); do
+        WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
         if [[ -f "$STATUS_FILE" ]]; then
             STATUS=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '[:space:]')
@@ -198,23 +210,56 @@ PY
                 unlock
                 release_task_lock "$TASK_ID"
                 
-                echo "[$(date '+%H:%M:%S')] Merging worker-$i to dev..."
-                cd "$PROJECT_ROOT"
-                
-                git fetch origin dev
-                git fetch origin worker-$i 2>/dev/null || true
-                
-                git checkout dev
-                
-                if git merge --no-edit origin/worker-$i -m "feat: merge worker-$i ($TASK_ID)"; then
-                    if git push origin dev; then
-                        echo "[$(date '+%H:%M:%S')] Successfully merged worker-$i to dev"
+                echo "[$(date '+%H:%M:%S')] Integrating worker-$i -> $DEV_BRANCH..."
+                WORKER_BRANCH="worker-$i"
+                if git -C "$WORKER_DIR" fetch origin "$DEV_BRANCH" && \
+                   git -C "$WORKER_DIR" fetch origin "$WORKER_BRANCH" 2>/dev/null && \
+                   git -C "$WORKER_DIR" checkout "$WORKER_BRANCH" 2>/dev/null; then
+                    if git -C "$WORKER_DIR" rebase "origin/$DEV_BRANCH"; then
+                        git -C "$WORKER_DIR" push --force-with-lease origin "$WORKER_BRANCH" || true
+                        if git -C "$WORKER_DIR" push origin "$WORKER_BRANCH:$DEV_BRANCH"; then
+                            echo "[$(date '+%H:%M:%S')] Successfully integrated worker-$i to $DEV_BRANCH"
+                        else
+                            echo "[$(date '+%H:%M:%S')] ERROR: Push worker-$i to $DEV_BRANCH failed."
+                            lock
+                            python3 << PY
+import json
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+for task in data['tasks']:
+    if task['id'] == '$TASK_ID':
+        task['status'] = 'error'
+        task['error_msg'] = 'Push worker branch to integration branch failed'
+        break
+with open('dev-tasks.json', 'w') as f:
+    json.dump(data, f, indent=2)
+PY
+                            unlock
+                            echo "error:$TASK_ID" > "$STATUS_FILE"
+                            continue
+                        fi
                     else
-                        echo "[$(date '+%H:%M:%S')] Warning: Failed to push dev branch"
+                        echo "[$(date '+%H:%M:%S')] ERROR: Rebase conflict! Aborting rebase."
+                        git -C "$WORKER_DIR" rebase --abort 2>/dev/null || true
+                        lock
+                        python3 << PY
+import json
+with open('dev-tasks.json', 'r') as f:
+    data = json.load(f)
+for task in data['tasks']:
+    if task['id'] == '$TASK_ID':
+        task['status'] = 'error'
+        task['error_msg'] = 'Rebase conflict to integration branch'
+        break
+with open('dev-tasks.json', 'w') as f:
+    json.dump(data, f, indent=2)
+PY
+                        unlock
+                        echo "error:$TASK_ID" > "$STATUS_FILE"
+                        continue
                     fi
                 else
-                    echo "[$(date '+%H:%M:%S')] ERROR: Merge conflict! Aborting merge."
-                    git merge --abort 2>/dev/null || true
+                    echo "[$(date '+%H:%M:%S')] ERROR: Worker branch sync failed."
                     lock
                     python3 << PY
 import json
@@ -223,7 +268,7 @@ with open('dev-tasks.json', 'r') as f:
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'error'
-        task['error_msg'] = 'Merge conflict to dev branch'
+        task['error_msg'] = 'Worker branch sync failed'
         break
 with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
@@ -261,13 +306,13 @@ PY
 
     # 找空闲 Worker
     IDLE_WORKERS=()
-    for i in {1..5}; do
-        WORKER_DIR="$PROJECT_ROOT/../agent-w$i"
+    for i in $(seq 1 "$WORKER_COUNT"); do
+        WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
         
         if [[ -f "$STATUS_FILE" ]]; then
             STATUS=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '[:space:]' || echo "unknown")
-            RUNNING_PID=$(pgrep -f "kimi.*--session=agent-w$i" | head -1 || true)
+            RUNNING_PID=$(pgrep -f "kimi.*--session=w$i" | head -1 || true)
             
             if [[ "$STATUS" == "idle" && -z "$RUNNING_PID" ]]; then
                 IDLE_WORKERS+=("$i")
@@ -320,7 +365,7 @@ PY
         
         IFS='|' read -r TASK_ID TASK_TITLE TASK_LOCK_PATHS <<< "$TASK_LINE"
         
-        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "agent-w$WORKER_ID" "$TASK_LOCK_PATHS" 2>/dev/null); then
+        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "w$WORKER_ID" "$TASK_LOCK_PATHS" 2>/dev/null); then
             if [[ -z "$CONFLICT_REASON" ]]; then
                 CONFLICT_REASON="CONFLICT:unknown"
             fi
@@ -330,19 +375,29 @@ PY
         fi
         
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
-        echo "[$(date '+%H:%M:%S')] Syncing dev -> worker-$WORKER_ID..."
-        cd "$PROJECT_ROOT"
+        WORKER_DIR="$PROJECT_ROOT/../workers/w$WORKER_ID"
+        echo "[$(date '+%H:%M:%S')] Syncing $DEV_BRANCH -> worker-$WORKER_ID..."
         
-        git fetch origin dev || true
-        
-        git checkout worker-$WORKER_ID 2>/dev/null || git checkout -b worker-$WORKER_ID
-        
-        if ! git merge --no-edit origin/dev -m "sync: merge dev before $TASK_ID"; then
-            echo "[$(date '+%H:%M:%S')] Warning: Merge dev to worker-$WORKER_ID failed, continuing anyway"
-            git merge --abort 2>/dev/null || true
+        if ! git -C "$WORKER_DIR" fetch origin "$DEV_BRANCH"; then
+            echo "[$(date '+%H:%M:%S')] Warning: Fetch origin/$DEV_BRANCH failed, skip $TASK_ID"
+            release_task_lock "$TASK_ID"
+            TASK_IDX=$((TASK_IDX + 1))
+            continue
         fi
         
-        git push origin worker-$WORKER_ID || true
+        if ! git -C "$WORKER_DIR" checkout "worker-$WORKER_ID" 2>/dev/null; then
+            git -C "$WORKER_DIR" checkout -b "worker-$WORKER_ID" || true
+        fi
+        
+        if ! git -C "$WORKER_DIR" rebase "origin/$DEV_BRANCH"; then
+            echo "[$(date '+%H:%M:%S')] Warning: Rebase $DEV_BRANCH to worker-$WORKER_ID failed, skip $TASK_ID"
+            git -C "$WORKER_DIR" rebase --abort 2>/dev/null || true
+            release_task_lock "$TASK_ID"
+            TASK_IDX=$((TASK_IDX + 1))
+            continue
+        fi
+        
+        git -C "$WORKER_DIR" push --force-with-lease origin "worker-$WORKER_ID" || true
         
         lock
         python3 << PY
@@ -352,22 +407,19 @@ with open('dev-tasks.json', 'r') as f:
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'running'
-        task['assigned_to'] = 'agent-w$WORKER_ID'
+        task['assigned_to'] = 'w$WORKER_ID'
         task['started_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
 with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
         unlock
         
-        WORKER_DIR="$PROJECT_ROOT/../agent-w$WORKER_ID"
         STATUS_FILE="$WORKER_DIR/STATUS.txt"
         echo "busy:$TASK_ID" > "$STATUS_FILE"
         
-        cd "$WORKER_DIR" && git pull origin worker-$WORKER_ID 2>/dev/null || true
-        
         (
             cd "$WORKER_DIR"
-            if kimi --print --session=agent-w$WORKER_ID -p "Task: $TASK_ID - $TASK_TITLE.
+            if kimi --print --session=w$WORKER_ID -p "Task: $TASK_ID - $TASK_TITLE.
 
 CRITICAL: Read AGENT.md first to understand the workflow and constraints.
 
@@ -385,7 +437,7 @@ Do not skip the git commit step."; then
             else
                 echo "error:$TASK_ID" > STATUS.txt
             fi
-        ) >> "$PROJECT_ROOT/logs/agent-w$WORKER_ID.log" 2>&1 &
+        ) >> "$PROJECT_ROOT/logs/w$WORKER_ID.log" 2>&1 &
         
         TASK_IDX=$((TASK_IDX + 1))
         
