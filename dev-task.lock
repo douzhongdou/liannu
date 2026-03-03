@@ -1,24 +1,4 @@
 {
   "version": "1.0",
-  "locks": [
-    {
-      "task_id": "T1",
-      "worker": "w1",
-      "paths": [
-        "src/utils.js",
-        "src/utils.test.js"
-      ],
-      "locked_at": "2026-03-03T11:49:07Z",
-      "heartbeat_at": "2026-03-03T11:49:07Z"
-    },
-    {
-      "task_id": "T2",
-      "worker": "w2",
-      "paths": [
-        "readme.md"
-      ],
-      "locked_at": "2026-03-03T11:49:29Z",
-      "heartbeat_at": "2026-03-03T11:49:29Z"
-    }
-  ]
+  "locks": []
 }

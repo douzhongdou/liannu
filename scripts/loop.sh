@@ -112,6 +112,11 @@ def normalize(path: str) -> str:
     value = value.strip("/")
     return value
 
+def is_path_conflict(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    return a.startswith(b + "/") or b.startswith(a + "/")
+
 def parse_obj(raw: str):
     raw = raw.strip()
     if not raw:
@@ -228,13 +233,15 @@ locks = [entry for entry in locks if entry.get("task_id") != task_id]
 
 request_set = set(paths)
 for entry in locks:
-    existing_set = set(entry.get("paths", []))
+    existing_set = {normalize(p) for p in entry.get("paths", []) if normalize(p)}
     if "__global__" in existing_set or "__global__" in request_set:
         print(f"CONFLICT:{entry.get('task_id','unknown')}")
         raise SystemExit(2)
-    if request_set.intersection(existing_set):
-        print(f"CONFLICT:{entry.get('task_id','unknown')}")
-        raise SystemExit(2)
+    for req in request_set:
+        for ex in existing_set:
+            if is_path_conflict(req, ex):
+                print(f"CONFLICT:{entry.get('task_id','unknown')}")
+                raise SystemExit(2)
 
 now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 locks.append({

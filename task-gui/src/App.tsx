@@ -132,10 +132,10 @@ function App() {
             </h1>
             <button
               onClick={loadData}
-              className="p-2.5 text-secondary-500 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg transition-all duration-200 hover:scale-105"
+              className="p-2.5 text-secondary-500 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg transition-all duration-300 hover:scale-105 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900"
               title="刷新"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 transition-transform duration-300 hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -145,15 +145,15 @@ function App() {
 
           {/* View Tabs */}
           <div className="flex flex-wrap items-center gap-4 mt-8 mb-8">
-            <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1">
+            <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1 shadow-sm">
               {(['task', 'agent'] as ViewMode[]).map(mode => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-5 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-300 ${
                     viewMode === mode
-                      ? 'bg-primary-500 text-white shadow-sm'
-                      : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700'
+                      ? 'bg-primary-500 text-white shadow-md focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
+                      : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700 focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
                   }`}
                 >
                   {mode === 'task' ? '任务' : '执行者'}
@@ -164,15 +164,15 @@ function App() {
             {viewMode === 'task' && (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-secondary-600 dark:text-secondary-400">视图:</span>
-                <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1">
+                <div className="flex bg-secondary-100 dark:bg-secondary-800 rounded-lg p-1 shadow-sm">
                   {(['card', 'table', 'kanban'] as TaskViewType[]).map(type => (
                     <button
                       key={type}
                       onClick={() => setTaskViewType(type)}
-                      className={`px-4 py-2 rounded-md text-sm transition-all duration-200 ${
+                      className={`px-4 py-2 rounded-md text-sm transition-all duration-300 ${
                         taskViewType === type
-                          ? 'bg-primary-500 text-white shadow-sm'
-                          : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700'
+                          ? 'bg-primary-500 text-white shadow-md focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
+                          : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-200 dark:hover:bg-secondary-700 focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
                       }`}
                     >
                       {type === 'card' ? '卡片' : type === 'table' ? '表格' : '看板'}
@@ -204,10 +204,10 @@ function App() {
                     <button
                       key={option.value}
                       onClick={() => setFilterStatus(option.value)}
-                      className={`px-4 py-2 text-sm rounded-lg transition-all duration-200 ${
+                      className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 ${
                         filterStatus === option.value
-                          ? 'bg-primary-500 text-white shadow-sm'
-                          : 'bg-white dark:bg-secondary-800 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-700 border border-secondary-200 dark:border-secondary-700'
+                          ? 'bg-primary-500 text-white shadow-md focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
+                          : 'bg-white dark:bg-secondary-800 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-700 border border-secondary-200 dark:border-secondary-700 shadow-sm hover:shadow-md focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-secondary-900'
                       }`}
                     >
                       {option.label}
