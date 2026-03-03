@@ -23,12 +23,12 @@ export function TaskStats({ tasks }: TaskStatsProps) {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-8 p-6 bg-white dark:bg-secondary-800 rounded-2xl border border-secondary-200 dark:border-secondary-700 shadow-md">
+    <div className="flex flex-wrap items-center gap-8 p-6 bg-white dark:bg-secondary-800 rounded-2xl border border-secondary-200 dark:border-secondary-700 shadow-md transition-all duration-300 hover:shadow-lg">
       {statItems.map(item => (
-        <div key={item.label} className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${item.color}`} />
+        <div key={item.label} className="flex items-center gap-3 transition-all duration-300 hover:scale-105">
+          <div className={`w-3 h-3 rounded-full ${item.color} transition-all duration-300 hover:scale-110`} />
           <span className="text-sm font-medium text-secondary-600 dark:text-secondary-400">{item.label}:</span>
-          <span className="text-lg font-semibold text-secondary-900 dark:text-secondary-100">{item.value}</span>
+          <span className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 transition-all duration-300 hover:text-primary-500">{item.value}</span>
         </div>
       ))}
     </div>

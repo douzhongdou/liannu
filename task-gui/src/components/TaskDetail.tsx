@@ -27,10 +27,10 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
     <div className="h-full overflow-auto">
       <div className="p-6 animate-fade-in">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-sm font-mono text-secondary-500 dark:text-secondary-400 bg-secondary-100 dark:bg-secondary-700 px-2.5 py-1 rounded">{task.id}</span>
-            <span className={`text-xs px-3 py-1 rounded-full text-white ${statusColors[task.status]}`}>
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-sm font-mono text-secondary-500 dark:text-secondary-400 bg-secondary-100 dark:bg-secondary-700 px-2.5 py-1 rounded-md">{task.id}</span>
+            <span className={`text-xs px-3 py-1.5 rounded-full text-white ${statusColors[task.status]}`}>
               {statusLabels[task.status]}
             </span>
           </div>
@@ -38,22 +38,22 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-          <div className="bg-white dark:bg-secondary-800 rounded-xl p-4 border border-secondary-200 dark:border-secondary-700 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
+          <div className="bg-white dark:bg-secondary-800 rounded-2xl p-5 border border-secondary-200 dark:border-secondary-700 shadow-md">
             <label className="text-xs font-medium text-secondary-500 dark:text-secondary-400 block mb-2">执行者</label>
-            <span className="text-sm text-secondary-900 dark:text-secondary-100">{worker || '未分配'}</span>
+            <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">{worker || '未分配'}</span>
           </div>
-          <div className="bg-white dark:bg-secondary-800 rounded-xl p-4 border border-secondary-200 dark:border-secondary-700 shadow-sm">
+          <div className="bg-white dark:bg-secondary-800 rounded-2xl p-5 border border-secondary-200 dark:border-secondary-700 shadow-md">
             <label className="text-xs font-medium text-secondary-500 dark:text-secondary-400 block mb-2">工作分支</label>
-            <span className="text-sm text-secondary-900 dark:text-secondary-100">{task.work_branch || 'N/A'}</span>
+            <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">{task.work_branch || 'N/A'}</span>
           </div>
-          <div className="bg-white dark:bg-secondary-800 rounded-xl p-4 border border-secondary-200 dark:border-secondary-700 shadow-sm">
+          <div className="bg-white dark:bg-secondary-800 rounded-2xl p-5 border border-secondary-200 dark:border-secondary-700 shadow-md">
             <label className="text-xs font-medium text-secondary-500 dark:text-secondary-400 block mb-2">Plan 模式</label>
-            <span className="text-sm text-secondary-900 dark:text-secondary-100">{task.plan_mode ? '是' : '否'}</span>
+            <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">{task.plan_mode ? '是' : '否'}</span>
           </div>
-          <div className="bg-white dark:bg-secondary-800 rounded-xl p-4 border border-secondary-200 dark:border-secondary-700 shadow-sm">
+          <div className="bg-white dark:bg-secondary-800 rounded-2xl p-5 border border-secondary-200 dark:border-secondary-700 shadow-md">
             <label className="text-xs font-medium text-secondary-500 dark:text-secondary-400 block mb-2">错误次数</label>
-            <span className={`text-sm ${task.error_count > 0 ? 'text-red-600 dark:text-red-400' : 'text-secondary-900 dark:text-secondary-100'}`}>
+            <span className={`text-sm font-medium ${task.error_count > 0 ? 'text-red-600 dark:text-red-400' : 'text-secondary-900 dark:text-secondary-100'}`}>
               {task.error_count}
             </span>
           </div>
@@ -61,11 +61,11 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
 
         {/* Dependencies */}
         {task.dependencies.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-3">依赖任务</h3>
-            <div className="flex flex-wrap gap-2.5">
+          <div className="mb-10">
+            <h3 className="text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-4">依赖任务</h3>
+            <div className="flex flex-wrap gap-3">
               {task.dependencies.map(dep => (
-                <span key={dep} className="text-xs px-3 py-1.5 rounded-lg bg-secondary-100 dark:bg-secondary-700 text-secondary-700 dark:text-secondary-300">
+                <span key={dep} className="text-xs px-3 py-1.5 rounded-lg bg-secondary-100 dark:bg-secondary-700 text-secondary-700 dark:text-secondary-300 border border-secondary-200 dark:border-secondary-600">
                   {dep}
                 </span>
               ))}
@@ -74,9 +74,9 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
         )}
 
         {/* Prompt */}
-        <div className="mb-8">
-          <h3 className="text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-3">任务描述</h3>
-          <div className="bg-white dark:bg-secondary-800 rounded-xl p-5 border border-secondary-200 dark:border-secondary-700 shadow-sm">
+        <div className="mb-10">
+          <h3 className="text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-4">任务描述</h3>
+          <div className="bg-white dark:bg-secondary-800 rounded-2xl p-6 border border-secondary-200 dark:border-secondary-700 shadow-md">
             <pre className="text-sm text-secondary-800 dark:text-secondary-200 whitespace-pre-wrap font-mono leading-relaxed">
               {task.prompt}
             </pre>
@@ -85,9 +85,9 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
 
         {/* Error Message */}
         {task.error_msg && (
-          <div className="mb-8">
-            <h3 className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">错误信息</h3>
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-5 shadow-sm">
+          <div className="mb-10">
+            <h3 className="text-sm font-medium text-red-600 dark:text-red-400 mb-4">错误信息</h3>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 shadow-md">
               <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono leading-relaxed">
                 {task.error_msg}
               </pre>
@@ -96,7 +96,7 @@ export function TaskDetail({ task, locks }: TaskDetailProps) {
         )}
 
         {/* Timestamps */}
-        <div className="text-xs text-secondary-500 dark:text-secondary-400 space-y-2">
+        <div className="text-xs text-secondary-500 dark:text-secondary-400 space-y-3">
           {task.started_at && (
             <p className="flex items-center gap-2">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

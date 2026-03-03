@@ -248,7 +248,7 @@ function App() {
                       </h2>
                     </div>
                     {filteredTasks.length === 0 ? (
-                      <div className="text-center py-20 bg-white dark:bg-secondary-800 rounded-xl border border-secondary-200 dark:border-secondary-700 animate-fade-in">
+                      <div className="text-center py-20 bg-white dark:bg-secondary-800 rounded-2xl border border-secondary-200 dark:border-secondary-700 animate-fade-in shadow-md">
                         <svg className="w-16 h-16 mx-auto mb-4 opacity-40 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
