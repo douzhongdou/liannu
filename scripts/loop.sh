@@ -13,16 +13,33 @@ fi
 
 echo "[$(date '+%H:%M:%S')] Ralph Loop started"
 
+LOCK_FILE="$PROJECT_ROOT/dev-task.lock"
+
 cleanup() {
     echo "[$(date '+%H:%M:%S')] Stopping..."
     pkill -f "kimi.*agent-w" 2>/dev/null || true
-    rm -rf .lock 2>/dev/null || true
+    rm -f "$LOCK_FILE" 2>/dev/null || true
     exit 0
 }
 trap cleanup SIGINT SIGTERM
 
-lock() { while ! mkdir .lock 2>/dev/null; do sleep 0.5; done; }
-unlock() { rmdir .lock 2>/dev/null || true; }
+# 使用文件锁保护 dev-tasks.json
+# 所有 worker 通过 symlink 共享同一个 dev-task.lock 文件
+lock() {
+    while true; do
+        # 尝试创建锁文件（原子操作）
+        if (set -C; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+            # 成功获取锁
+            return 0
+        fi
+        # 锁被占用，等待
+        sleep 0.1
+    done
+}
+
+unlock() {
+    rm -f "$LOCK_FILE" 2>/dev/null || true
+}
 
 MAX_WORKERS=3
 
