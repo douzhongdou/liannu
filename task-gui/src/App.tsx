@@ -262,51 +262,7 @@ function App() {
 
           {/* 任务标签页 */}
           <TabsContent value="task" className="mt-0 space-y-6 [scrollbar-gutter:stable]">
-            {/* 任务统计卡片 */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-              <StatBadge
-                icon={<Clock className="w-4 h-4" />}
-                label="待处理"
-                value={taskStats.pending}
-                color="bg-slate-100 text-slate-600"
-              />
-              <StatBadge
-                icon={<Lightbulb className="w-4 h-4" />}
-                label="规划中"
-                value={taskStats.planning}
-                color="bg-amber-50 text-amber-600"
-              />
-              <StatBadge
-                icon={<PlayCircle className="w-4 h-4" />}
-                label="进行中"
-                value={taskStats.running}
-                color="bg-blue-50 text-blue-600"
-              />
-              <StatBadge
-                icon={<LayoutDashboard className="w-4 h-4" />}
-                label="待集成"
-                value={taskStats.ready_to_integrate}
-                color="bg-purple-50 text-purple-600"
-              />
-              <StatBadge
-                icon={<CheckCircle2 className="w-4 h-4" />}
-                label="已完成"
-                value={taskStats.completed}
-                color="bg-emerald-50 text-emerald-600"
-              />
-              <StatBadge
-                icon={<AlertCircle className="w-4 h-4" />}
-                label="错误"
-                value={taskStats.failed}
-                color="bg-red-50 text-red-600"
-              />
-              <StatBadge
-                icon={<ListTodo className="w-4 h-4" />}
-                label="总计"
-                value={taskStats.total}
-                color="bg-slate-100 text-slate-700"
-              />
-            </div>
+   
 
             {/* 筛选和搜索 */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -377,7 +333,7 @@ function App() {
 
           {/* 执行者标签页 */}
           <TabsContent value="agent" className="mt-0 [scrollbar-gutter:stable]">
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
               <AgentList agentStatus={agentStatus} tasks={tasks} />
             </div>
           </TabsContent>
@@ -402,14 +358,6 @@ interface StatBadgeProps {
   color: string;
 }
 
-const StatBadge = ({ icon, label, value, color }: StatBadgeProps) => (
-  <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${color}`}>
-    <div className="flex items-center gap-2">
-      {icon}
-      <span className="text-sm font-medium">{label}</span>
-    </div>
-    <span className="text-lg font-bold">{value}</span>
-  </div>
-)
+
 
 export default App

@@ -87,6 +87,7 @@ for i in $(seq 1 "$WORKER_COUNT"); do
     ln -sf "../../workflow/dev-task.lock" "$WORKER_DIR/dev-task.lock"
     [ -f "$WORKFLOW_ROOT/api-key.json" ] && ln -sf "../../workflow/api-key.json" "$WORKER_DIR/api-key.json"
     ln -sf "../../workflow/AGENT.md" "$WORKER_DIR/AGENT.md"
+    ln -sf "../../workflow/PLAN.md" "$WORKER_DIR/PLAN.md"
 
     mkdir -p "$WORKER_DIR/data"
     rm -f "$WORKER_DIR/STATUS.txt"

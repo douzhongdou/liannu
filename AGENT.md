@@ -25,7 +25,7 @@
 
 ### Phase 2: 规划（Plan Mode）
 - **触发条件**: 任务复杂度高（涉及3+文件或架构决策），默认进入计划模式
-- **动作**: 创建 `PLAN.md`，包含技术选型、模块拆解、验收标准
+- **动作**: 参考 `PLAN.md`，包含技术选型、模块拆解、验收标准
 - **原则**: 若执行中偏离轨道，**立即停下重新规划**，不要硬撑
 - 规划完成后立即执行，不要等待确认
 
@@ -54,6 +54,13 @@
 - 运行测试 → 检查构建 → 确认功能 → 对比 diff
 - **自检**: "Staff Engineer 会批准这个提交吗？"
 - 提供运行命令、功能清单、已知限制清单
+- **禁止长时间阻塞**: 启动服务命令（如 `npm run dev`）必须设置超时或后台运行，禁止阻塞 Agent 进程。
+  - **开发验证场景**: 使用 `timeout` 或后台运行 + `sleep` + `curl` 验证，验证后必须清理进程。
+    - ✅ `timeout 10s npm run dev`
+    - ✅ `npm run dev & PID=$!; sleep 10; curl http://localhost:5173; kill $PID`
+  - **需要服务常驻场景** (如测试员 Agent): 使用后台运行 `&`，并记录 PID 以便后续管理，**不要**让 Shell 挂起等待。
+    - ✅ `npm run start > server.log 2>&1 &`
+  - ❌ 直接运行 `npm run dev` (会导致 Agent 永远卡住)
 
 ### Phase 6: Git 提交（强制）
 
@@ -90,32 +97,39 @@ git push origin $(git branch --show-current)
 - **原子性**: 一个任务对应一个 commit，保持提交历史清晰
 - **信息**: 提交消息简洁明确（<50字），说明核心变更
 
-### Phase 7: Loop 自动合并到 dev（无需 Agent 操作）
+### Phase 7: 代码合并（自主解决冲突）
 
-**Agent 无需操作，Loop 会自动处理：**
+**你可能会收到 "Locked Files" 警告，这意味着其他 Agent 也在修改这些文件。**
 
-1. Agent 推送 worker 分支后，进程退出
-2. Loop 检测到 Worker 进程结束且 exit code 为 0
-3. Loop 自动将 worker 分支合并到 dev
-4. 如果合并冲突，Loop 会标记任务为 error，需要人工介入
+**在 Push 前，你必须确保你的代码能干净地合并到 dev 分支：**
 
-**所以 Agent 只需要：**
-- 提交代码（`git commit`）
-- 推送到远程（`git push`）
-- **不要**写任何状态文件（STATUS.txt 已废弃）
+1. **拉取最新代码**:
+   ```bash
+   git fetch origin dev
+   ```
 
-**不要直接操作 dev 或 main 分支！**
+2. **尝试 Rebase (推荐)**:
+   ```bash
+   git rebase origin/dev
+   ```
+   - 如果遇到冲突，`git status` 查看冲突文件。
+   - 编辑文件解决冲突（保留双方合理的修改）。
+   - `git add <file>`
+   - `git rebase --continue`
+   - 重复直到 Rebase 完成。
 
-```bash
-# 1. 获取最新 dev 分支变更（预防冲突）
-git fetch origin
+3. **运行测试**:
+   - 解决冲突后，**必须重新运行测试**，确保合并没破坏功能。
 
-# 2. 尝试将 dev 的最新代码合并到当前 worker 分支（可选，Loop 会处理）
-# git merge origin/dev
+4. **推送代码**:
+   ```bash
+   git push origin $(git branch --show-current) --force-with-lease
+   ```
 
-# 3. 推送当前 worker 分支到远程
-git push origin worker-X
-```
+**Loop 仍然会尝试帮你合并，但如果你已经处理好了冲突，Loop 的合并就会非常顺利。**
+
+### Phase 8: Loop 自动合并到 dev（无需 Agent 操作）
+（此阶段作为最后的兜底机制）
 
 **注意：**
 - 不要直接 `git checkout dev`，worktree 绑定到特定分支
