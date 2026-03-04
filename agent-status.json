@@ -1,0 +1,217 @@
+{
+  "updated_at": "2026-03-04T06:55:42Z",
+  "workers": {
+    "w1": {
+      "status": "idle",
+      "current_task_id": null,
+      "current_task_title": null,
+      "message": "Task T1 integrated successfully",
+      "updated_at": "2026-03-04T06:55:04Z"
+    },
+    "w2": {
+      "status": "idle",
+      "current_task_id": null,
+      "current_task_title": null,
+      "message": "Task T2 integrated successfully",
+      "updated_at": "2026-03-04T06:55:32Z"
+    },
+    "w3": {
+      "status": "integrating",
+      "current_task_id": "T3",
+      "current_task_title": null,
+      "message": "Merging to dev...",
+      "updated_at": "2026-03-04T06:55:42Z"
+    },
+    "w4": {
+      "status": "idle",
+      "current_task_id": "T4",
+      "current_task_title": "创建API文档",
+      "message": "Task execution completed, ready for integrate",
+      "updated_at": "2026-03-04T06:55:37Z"
+    },
+    "w5": {
+      "status": "idle",
+      "current_task_id": null,
+      "current_task_title": null,
+      "message": "Worker initialized",
+      "updated_at": "2026-03-04T06:53:13Z"
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-04T06:55:42Z",
+      "worker": "w3",
+      "event": "integrating",
+      "task_id": "T3",
+      "detail": "Merging to dev..."
+    },
+    {
+      "timestamp": "2026-03-04T06:55:42Z",
+      "worker": "w3",
+      "event": "integrating",
+      "task_id": "T3",
+      "detail": "Syncing code to integration branch"
+    },
+    {
+      "timestamp": "2026-03-04T06:55:41Z",
+      "worker": "w3",
+      "event": "idle",
+      "task_id": "T3",
+      "detail": "Task execution completed, ready for integrate"
+    },
+    {
+      "timestamp": "2026-03-04T06:55:37Z",
+      "worker": "w4",
+      "event": "idle",
+      "task_id": "T4",
+      "detail": "Task execution completed, ready for integrate"
+    },
+    {
+      "timestamp": "2026-03-04T06:55:32Z",
+      "worker": "w2",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Task T2 integrated successfully"
+    },
+    {
+      "timestamp": "2026-03-04T06:55:14Z",
+      "worker": "w2",
+      "event": "integrating",
+      "task_id": "T2",
+      "detail": "Merging to dev..."
+    },
+    {
+      "timestamp": "2026-03-04T06:55:14Z",
+      "worker": "w2",
+      "event": "integrating",
+      "task_id": "T2",
+      "detail": "Syncing code to integration branch"
+    },
+    {
+      "timestamp": "2026-03-04T06:55:04Z",
+      "worker": "w1",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Task T1 integrated successfully"
+    },
+    {
+      "timestamp": "2026-03-04T06:54:56Z",
+      "worker": "w2",
+      "event": "idle",
+      "task_id": "T2",
+      "detail": "Task execution completed, ready for integrate"
+    },
+    {
+      "timestamp": "2026-03-04T06:54:46Z",
+      "worker": "w1",
+      "event": "integrating",
+      "task_id": "T1",
+      "detail": "Merging to dev..."
+    },
+    {
+      "timestamp": "2026-03-04T06:54:46Z",
+      "worker": "w1",
+      "event": "integrating",
+      "task_id": "T1",
+      "detail": "Syncing code to integration branch"
+    },
+    {
+      "timestamp": "2026-03-04T06:54:40Z",
+      "worker": "w4",
+      "event": "working",
+      "task_id": "T4",
+      "detail": "Coding & Testing..."
+    },
+    {
+      "timestamp": "2026-03-04T06:54:10Z",
+      "worker": "w4",
+      "event": "planning",
+      "task_id": "T4",
+      "detail": "Planning lock paths..."
+    },
+    {
+      "timestamp": "2026-03-04T06:54:09Z",
+      "worker": "w3",
+      "event": "working",
+      "task_id": "T3",
+      "detail": "Coding & Testing..."
+    },
+    {
+      "timestamp": "2026-03-04T06:54:08Z",
+      "worker": "w1",
+      "event": "idle",
+      "task_id": "T1",
+      "detail": "Task execution completed, ready for integrate"
+    },
+    {
+      "timestamp": "2026-03-04T06:53:51Z",
+      "worker": "w3",
+      "event": "planning",
+      "task_id": "T3",
+      "detail": "Planning lock paths..."
+    },
+    {
+      "timestamp": "2026-03-04T06:53:50Z",
+      "worker": "w2",
+      "event": "working",
+      "task_id": "T2",
+      "detail": "Coding & Testing..."
+    },
+    {
+      "timestamp": "2026-03-04T06:53:35Z",
+      "worker": "w2",
+      "event": "planning",
+      "task_id": "T2",
+      "detail": "Planning lock paths..."
+    },
+    {
+      "timestamp": "2026-03-04T06:53:33Z",
+      "worker": "w1",
+      "event": "working",
+      "task_id": "T1",
+      "detail": "Coding & Testing..."
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w1",
+      "event": "planning",
+      "task_id": "T1",
+      "detail": "Planning lock paths..."
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w5",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Worker initialized"
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w4",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Worker initialized"
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w3",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Worker initialized"
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w2",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Worker initialized"
+    },
+    {
+      "timestamp": "2026-03-04T06:53:13Z",
+      "worker": "w1",
+      "event": "idle",
+      "task_id": null,
+      "detail": "Worker initialized"
+    }
+  ]
+}

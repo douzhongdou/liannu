@@ -89,7 +89,7 @@ for i in $(seq 1 "$WORKER_COUNT"); do
     ln -sf "../../workflow/AGENT.md" "$WORKER_DIR/AGENT.md"
 
     mkdir -p "$WORKER_DIR/data"
-    echo "idle" > "$WORKER_DIR/STATUS.txt"
+    rm -f "$WORKER_DIR/STATUS.txt"
 
     git -C "$WORKER_DIR" config user.email "worker-$i@ralph.loop"
     git -C "$WORKER_DIR" config user.name "Worker $i"

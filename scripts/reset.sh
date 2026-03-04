@@ -83,6 +83,8 @@ try:
         task['started_at'] = None
         task['completed_at'] = None
         task['error_count'] = 0
+        task['error_msg'] = None
+        task['work_branch'] = None
         # 保留: id, title, prompt, dependencies, plan_mode
     
     with open('dev-tasks.json', 'w', encoding='utf-8') as f:
@@ -93,12 +95,13 @@ except Exception as e:
     print(f"  ✗ 重置失败: {e}")
 PYEOF
 
-echo "[额外] 重置 Worker 状态..."
+echo "[额外] 重置运行态文件..."
+rm -f "$PROJECT_ROOT/runtime-status/"*.status 2>/dev/null || true
 for i in $(seq 1 "$WORKER_COUNT"); do
     WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
     if [[ -f "$WORKER_DIR/STATUS.txt" ]]; then
-        echo "idle" > "$WORKER_DIR/STATUS.txt"
-        echo "  ✓ w$i 已重置为 idle"
+        rm -f "$WORKER_DIR/STATUS.txt"
+        echo "  ✓ w$i 旧 STATUS.txt 已清理"
     fi
 done
 
@@ -121,4 +124,3 @@ echo "  - 项目仓库分支已重置为 $PROJECT_MAIN_BRANCH"
 echo "  - 所有任务状态已重置为 pending"
 echo "  - 所有 worker 已重置为 idle"
 echo ""
-echo "可以重新运行 ./scripts/loop.sh 开始新任务"

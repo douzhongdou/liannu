@@ -94,14 +94,15 @@ git push origin $(git branch --show-current)
 
 **Agent 无需操作，Loop 会自动处理：**
 
-1. Agent 推送 worker 分支后，标记任务完成
-2. Loop 检测到 `done:T1` 后，自动将 worker 分支合并到 dev
-3. 如果合并冲突，Loop 会标记任务为 error，需要人工介入
+1. Agent 推送 worker 分支后，进程退出
+2. Loop 检测到 Worker 进程结束且 exit code 为 0
+3. Loop 自动将 worker 分支合并到 dev
+4. 如果合并冲突，Loop 会标记任务为 error，需要人工介入
 
 **所以 Agent 只需要：**
 - 提交代码（`git commit`）
 - 推送到远程（`git push`）
-- 标记 STATUS.txt 为 done
+- **不要**写任何状态文件（STATUS.txt 已废弃）
 
 **不要直接操作 dev 或 main 分支！**
 
@@ -119,31 +120,11 @@ git push origin worker-X
 **注意：**
 - 不要直接 `git checkout dev`，worktree 绑定到特定分支
 - 不要直接合并到 main，合并到 dev 的工作由 Loop 统一处理
-- 如果 `git push` 失败（如冲突），记录错误并继续，Loop 会处理
+- 如果 `git push` 失败（如冲突），记录错误并退出，Loop 会处理
 
-### Phase 8: 标记完成（关键：必须在清理前执行）
-- 写入 `STATUS.txt`: `done:${TASK_ID}`
-- 沉淀经验到 PROGRESS.md（**必须通过 git -C 操作主仓库**）：
-  
-  **重要：PROGRESS.md 不在当前目录，必须通过 git -C 操作主仓库**
-  
-  步骤：
-  1. 确保在主仓库的 dev 分支：
-     ```bash
-     git -C ../../workflow checkout dev
-     git -C ../../workflow pull origin dev
-     ```
-  2. 编辑主仓库的 PROGRESS.md：
-     ```bash
-     # 使用 WriteFile 工具编辑 ../../workflow/PROGRESS.md
-     # 内容格式：- [$(date)] $TASK_ID: 学到的经验/解决的问题
-     ```
-  3. 提交到主仓库：
-     ```bash
-     git -C ../../workflow add PROGRESS.md
-     git -C ../../workflow commit -m "docs: update progress for $TASK_ID"
-     git -C ../../workflow push origin dev
-     ```
+### Phase 8: 标记完成
+- Agent 进程只需正常退出 (exit 0) 即可，Loop 会自动捕获并更新状态。
+
 
 ### Phase 9: 清理
 - 由 ralph-loop 外部执行，Agent 无需处理
@@ -187,23 +168,27 @@ git push origin worker-X
 ### Worker 状态机
 ```
 idle      → 可接任务
-busy:T1   → 正在执行 T1
-done:T1   → T1 已完成（等待 Loop 回收）
-error:T1  → T1 失败
+planning  → 正在规划锁路径
+working   → 正在执行开发
+integrating → 正在合并代码
+error     → 任务失败
 ```
 
 ### 与 Loop 的通信流程
 ```
-Loop → dev-tasks.json (写入: status=running, assigned_to=agent-w1)
-Loop → STATUS.txt (写入: busy:T1)
+Loop → dev-tasks.json (写入: status=running, assigned_to=w1)
+Loop → agent-status.json (写入: status=working)
 Worker → dev-tasks.json (读取: 通过 Symlink 查看任务详情)
-Worker → STATUS.txt (写入: done:T1 或 error:T1)
-Loop → STATUS.txt (读取: done:T1)
+Worker → Git (提交代码并 Push)
+Loop → 检测到 Worker 进程退出
+Loop → Git (合并代码到 dev)
 Loop → dev-tasks.json (写入: status=done)
-Loop → STATUS.txt (写入: idle)
+Loop → agent-status.json (写入: status=idle)
 ```
 
-**重要**: Worker 只读 dev-tasks.json，只写 STATUS.txt。不要直接修改 JSON！
+**重要**: 
+1. Worker 只读 dev-tasks.json，不要直接修改 dev-tasks.json！
+2. 状态流转由 Loop 统一接管。
 
 ---
 
@@ -242,13 +227,30 @@ Loop → STATUS.txt (写入: idle)
   - `git rebase --continue`
   - 重复直到完成
   - 重新运行测试
+  - 
+**Rebase失败时的处理流程**:
+1. 如果是"unstaged changes"错误,先 commit或stash当前改动
+2. 如果有 merge conflicts:
+  - 查看冲突文件: git status
+  - 读取冲突文件内容,理解双方改动意图
+  - 手动解决冲突(保留正确的代码)
+  - git add <resolved-files>
+  - git rebase --continue
+3. 重复直到 rebase完成
+
+**测试失败时的处理流程**:
+1. 运行测试
+2. 如果失败,分析错误信息
+3. 修复代码中的bug
+4. 重新运行测试,直到全部通过
+5. 提交修复:`git commit -m "fix: ..."
+**不要放弃**: 遇到 rebase或测试失败时，必须解决问题后才能继续，不能直接标记为失败
 
 ---
 
 ## 七、禁止事项
 
-❌ 直接编辑本地的 `PROGRESS.md`（必须使用 `git -C ../../workflow` 编辑主仓库）  
-❌ 在 STATUS 标记为 done 前清理 worktree（会导致任务状态丢失）  
+❌ 直接编辑本地的 `PROGRESS.md`（要求git -C里修改）  
 ❌ 使用 any 类型（TypeScript 严格模式）  
 ❌ 留下 TODO 注释（必须完成或转为任务）  
 ❌ 直接写入 dev-tasks.json（Worker 只读，Loop 唯一写入者）
