@@ -1,5 +1,14 @@
 # Multi-Agent Workflow
 
+<div align="center">
+
+**面向多 Worker 并行开发的智能调度系统**  
+*调度与执行解耦 | 动态锁机制 | 实时状态监控*
+
+</div>
+
+---
+
 一个面向多 Worker 并行开发的调度仓库。  
 本仓库只负责任务编排、状态管理和调度，不承载项目业务代码。
 
@@ -19,7 +28,7 @@
 ## 目录结构
 
 ```text
-zhaopinweb/
+dir/
 ├─ workflow/
 │  ├─ config/workflow.env      # 配置文件
 │  ├─ dev-tasks.json           # 任务列表与状态
@@ -41,6 +50,38 @@ zhaopinweb/
    └─ ...
 ```
 
+## 配置说明
+
+在使用前，请先配置 `config/workflow.env` 文件：
+
+```bash
+# 工作流仓库的远程地址（用于同步调度逻辑）
+WORKFLOW_REMOTE=git@github.com:your-username/your-workflow.git
+
+# 项目主仓库的远程地址（真实业务代码）
+PROJECT_REMOTE=git@github.com:your-username/your-project.git
+
+# 项目主分支名称
+PROJECT_MAIN_BRANCH=main
+
+# Worker 数量（并行开发的 Agent 数量）
+WORKER_COUNT=5
+```
+
+**配置项说明：**
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| `WORKFLOW_REMOTE` | 当前调度仓库的 Git 远程地址 | `git@github.com:your-username/your-workflow.git` |
+| `PROJECT_REMOTE` | 业务代码仓库的 Git 远程地址 | `git@github.com:your-username/your-project.git` |
+| `PROJECT_MAIN_BRANCH` | 项目主分支名称 | `main` 或 `master` |
+| `WORKER_COUNT` | 并行 Worker 数量 | `3` ~ `10` |
+
+## 安装[kimicode](https://www.kimi.com/code)
+
+本项目使用了[kimicode](https://www.kimi.com/code)作为代码生成器。请确保在使用前已经安装了[kimicode](https://www.kimi.com/code)。
+其他工具在开发中。
+
 ## 快速开始
 
 ### 1) 一键初始化与重置 (推荐)
@@ -48,7 +89,7 @@ zhaopinweb/
 ```bash
 bash scripts/reboot.sh
 ```
-此命令会依次执行：代码回滚 -> 状态重置 -> 环境初始化。适合每次测试新流程前使用。
+此命令会依次执行：代码回滚 → 状态重置 → 环境初始化。适合每次测试新流程前使用。
 
 ### 2) 启动调度循环
 
@@ -80,7 +121,7 @@ cd task-gui
 npm install
 npm run dev
 ```
-启动后访问 `http://localhost:5173`，即可实时查看任务状态和 Agent 工作流。
+启动后访问 `http://localhost:3000`，即可实时查看任务状态和 Agent 工作流。
 
 ## 任务开发流程
 
@@ -98,6 +139,22 @@ npm run dev
 
 ## 常见问题
 
-- **Git 冲突**: 系统采用乐观锁，如果多个 Agent 修改同一文件，后提交的 Agent 需负责解决 Rebase 冲突。
-- **Kimi 响应慢**: `loop.sh` 可能会在规划阶段等待 Kimi API 响应，请耐心等待或检查网络。
-- **环境清理**: 遇到任何奇怪问题，直接运行 `bash scripts/reboot.sh`。
+**Q: 如何处理文件冲突？**  
+A: 本系统采用乐观锁机制。当多个 Worker 尝试修改同一文件时，调度器会在 `dev-task.lock` 中标记冲突，并在日志中预警。Agent 需要自主执行 `git rebase` 解决冲突。
+
+**Q: Worker 崩溃了怎么办？**  
+A: 调度器会定期检测 Worker 心跳。若 Worker 异常退出，其持有的文件锁会自动释放，任务会重新进入待分配队列。
+
+**Q: 可以动态添加 Worker 吗？**  
+A: 可以。只需在 `config/workflow.env` 中增加 `WORKERS` 列表，然后重启 `loop.sh` 即可。
+
+**Q: 如何调试单个任务？**  
+A: 推荐在 `workers/w1` 目录下手动执行命令，模拟 Agent 行为。调试完成后，再集成到自动化流程中。
+
+---
+
+<div align="center">
+
+**Happy Coding! 🚀**
+
+</div>
