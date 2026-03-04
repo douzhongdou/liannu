@@ -2,6 +2,15 @@
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
+
+# Parse arguments
+INF_MODE=0
+for arg in "$@"; do
+  if [[ "$arg" == "--inf" ]]; then
+    INF_MODE=1
+  fi
+done
+
 mkdir -p logs
 LOG_FILE="$PROJECT_ROOT/logs/loop.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -53,9 +62,58 @@ LOCK_TABLE_FILE="$PROJECT_ROOT/dev-task.lock"
 LOCK_GUARD_FILE="$PROJECT_ROOT/dev-task.lock.guard"
 STATUS_FILE="$PROJECT_ROOT/agent-status.json"
 
+
+# Worker Session 映射记录
+record_worker_session() {
+    local WORKER_ID="$1"
+    local SESSION_ID="$2"
+    local TASK_ID="$3"
+    local MAP_FILE="$PROJECT_ROOT/logs/worker-session-map.json"
+    
+    python3 -W ignore - "$WORKER_ID" "$SESSION_ID" "$TASK_ID" "$MAP_FILE" << 'PY'
+import json
+import sys
+import os
+from datetime import datetime, timezone
+
+worker_id, session_id, task_id, map_file = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+# 读取或创建映射文件
+data = {}
+if os.path.exists(map_file):
+    try:
+        with open(map_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except:
+        data = {}
+
+# 确保 worker 节点存在
+worker_key = f"w{worker_id}"
+if worker_key not in data:
+    data[worker_key] = {"current_session": None, "history": []}
+
+# 更新当前 session
+data[worker_key]["current_session"] = session_id
+
+# 添加到历史记录
+history_entry = {
+    "session_id": session_id,
+    "task_id": task_id,
+    "started_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+}
+data[worker_key]["history"].insert(0, history_entry)
+
+# 只保留最近 50 条记录
+data[worker_key]["history"] = data[worker_key]["history"][:50]
+
+with open(map_file, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+}
+
 cleanup() {
     echo "[$(date '+%H:%M:%S')] Stopping..."
-    pkill -f "kimi.*--session=w" 2>/dev/null || true
+    pkill -f "kimi" 2>/dev/null || true
     rm -f "$LOCK_GUARD_FILE" 2>/dev/null || true
     exit 0
 }
@@ -148,6 +206,11 @@ init_agent_status() {
 
 clean_worker_git_state() {
     local WORKER_DIR="$1"
+    # Force clean up any unstaged changes and untracked files
+    git -C "$WORKER_DIR" reset --hard HEAD 2>/dev/null || true
+    git -C "$WORKER_DIR" clean -fd 2>/dev/null || true
+    
+    # Restore STATUS.txt specifically if needed (though reset --hard usually handles tracked files)
     rm -f "$WORKER_DIR/STATUS.txt" 2>/dev/null || true
     git -C "$WORKER_DIR" restore --worktree --staged STATUS.txt 2>/dev/null || true
     git -C "$WORKER_DIR" checkout -- STATUS.txt 2>/dev/null || true
@@ -268,7 +331,7 @@ if not os.path.exists(path):
 PY
 }
 
-acquire_task_lock() {
+register_task_lock() {
     local TASK_ID="$1"
     local WORKER_NAME="$2"
     local TASK_LOCK_PATHS="$3"
@@ -321,23 +384,24 @@ locks = data.get("locks", [])
 locks = [entry for entry in locks if entry.get("task_id") != task_id]
 
 request_set = set(paths)
+conflict_messages = []
+
 for entry in locks:
     existing_set = {normalize(p) for p in entry.get("paths", []) if normalize(p)}
     
     # Global lock conflict check
     if "__global__" in existing_set:
-        print(f"CONFLICT:{entry.get('task_id','unknown')} (Global Lock Held)")
-        sys.exit(2)
-    if "__global__" in request_set:
-        print(f"CONFLICT:{entry.get('task_id','unknown')} (Requesting Global Lock)")
-        sys.exit(2)
-        
-    for req in request_set:
-        for ex in existing_set:
-            if is_path_conflict(req, ex):
-                print(f"CONFLICT:{entry.get('task_id','unknown')} (Path: {req} vs {ex})")
-                sys.exit(2)
+        conflict_messages.append(f"- Task {entry.get('task_id')} (Global Lock)")
+    elif "__global__" in request_set:
+        conflict_messages.append(f"- Task {entry.get('task_id')} (Global Lock Requested)")
+    else:
+        for req in request_set:
+            for ex in existing_set:
+                if is_path_conflict(req, ex):
+                    conflict_messages.append(f"- Task {entry.get('task_id')} (File: {ex})")
+                    break
 
+# Always register the lock (Optimistic Locking)
 now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 locks.append({
     "task_id": task_id,
@@ -351,20 +415,17 @@ data["locks"] = locks
 with open(lock_file, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 
-print("ACQUIRED")
+if conflict_messages:
+    print("\n".join(conflict_messages))
+else:
+    print("None")
 PY
     
-    local EXIT_CODE=$?
     RESULT=$(cat "$TMP_OUT")
     rm -f "$TMP_OUT"
     unlock
 
-    if [[ $EXIT_CODE -eq 0 ]]; then
-        return 0
-    fi
-
     echo "$RESULT"
-    return 1
 }
 
 release_task_lock() {
@@ -517,7 +578,11 @@ PY
     IDLE_WORKERS=()
     for i in $(seq 1 "$WORKER_COUNT"); do
         WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
-        RUNNING_PID=$(pgrep -f "kimi.*--session=w$i" | head -1 || true)
+        # 检查 Worker 是否运行中（通过状态文件）
+RUNNING_PID=""
+if [[ -f "$PROJECT_ROOT/logs/w$i.status" ]]; then
+    RUNNING_PID="running"
+fi
         RUNNING_TASK_ID=$(python3 -W ignore - "$i" << 'PY'
 import json
 import sys
@@ -647,35 +712,9 @@ PY
             update_agent_status "$WORKER_ID" "error" "$TASK_ID" "$TASK_TITLE" "Plan lock paths failed"
             continue
         fi
-        if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "w$WORKER_ID" "$PLANNED_LOCK_PATHS" 2>/dev/null); then
-            if [[ -z "$CONFLICT_REASON" ]]; then
-                CONFLICT_REASON="CONFLICT:unknown"
-            fi
-            echo "[$(date '+%H:%M:%S')] Skip $TASK_ID for Worker $WORKER_ID, $CONFLICT_REASON"
-            update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Skipped due to lock conflict: $CONFLICT_REASON"
-            lock
-            python3 -W ignore - "$TASK_ID" "$CONFLICT_REASON" << 'PY'
-import json
-import sys
-task_id = sys.argv[1]
-reason = sys.argv[2]
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
-for task in data.get('tasks', []):
-    if task.get('id') == task_id:
-        task['status'] = 'pending'
-        task['assigned_to'] = None
-        task['started_at'] = None
-        task['error_msg'] = reason
-        break
-with open('dev-tasks.json', 'w', encoding='utf-8') as f:
-    json.dump(data, f, indent=2, ensure_ascii=False)
-PY
-            unlock
-            TASK_IDX=$((TASK_IDX + 1))
-            update_agent_status "$WORKER_ID" "idle" "null" "null" "Skipped $TASK_ID: $CONFLICT_REASON"
-            continue
-        fi
+        
+        # Register lock and get potential conflicts (non-blocking)
+        EXISTING_LOCKS=$(register_task_lock "$TASK_ID" "w$WORKER_ID" "$PLANNED_LOCK_PATHS")
 
         git -C "$WORKER_DIR" push --force-with-lease origin "$TASK_WORK_BRANCH" 2>/dev/null || true
         
@@ -714,11 +753,26 @@ export LOCK_TABLE_FILE
 
         (
             cd "$WORKER_DIR"
-            if kimi --print --session=w$WORKER_ID -p "Task: $TASK_ID - $TASK_TITLE.
+            
+            # 生成 UUID 作为 session ID
+            SESSION_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))")
+            
+            # 记录 Worker-Session 映射
+            record_worker_session "$WORKER_ID" "$SESSION_ID" "$TASK_ID"
+            
+            # 启动 Worker，使用 UUID 作为 session 名
+            if kimi --yolo --session="$SESSION_ID" -p "Task: $TASK_ID - $TASK_TITLE.
 Current task branch: $TASK_WORK_BRANCH.
 Do not switch branches.
 
 CRITICAL: Read AGENT.md first to understand the workflow and constraints.
+
+WARNING: The following files are currently locked by other agents:
+$EXISTING_LOCKS
+If your task requires modifying these files, you MUST:
+1. Proceed with caution.
+2. Before pushing, perform a 'git pull --rebase origin dev' to sync latest changes.
+3. Resolve any merge conflicts autonomously.
 
 Then read dev-tasks.json for task details.
 
@@ -730,45 +784,65 @@ Execute the complete task lifecycle:
 5. Do not write any runtime status file; scheduler updates workflow state automatically.
 
 Do not skip the git commit step."; then
-                lock
-                python3 -W ignore << PY
+                echo "SUCCESS" > "$PROJECT_ROOT/logs/w$WORKER_ID.status"
+            else
+                echo "FAILURE" > "$PROJECT_ROOT/logs/w$WORKER_ID.status"
+            fi
+        ) >> "$PROJECT_ROOT/logs/w$WORKER_ID.log" 2>&1 &
+        WORKER_PID=$!
+
+        # 启动一个后台监听器，等待 Worker 完成
+        (
+            while kill -0 $WORKER_PID 2>/dev/null; do sleep 1; done
+            STATUS_FILE="$PROJECT_ROOT/logs/w$WORKER_ID.status"
+            if [[ -f "$STATUS_FILE" ]]; then
+                STATUS=$(cat "$STATUS_FILE")
+                rm -f "$STATUS_FILE"
+                if [[ "$STATUS" == "SUCCESS" ]]; then
+                    lock
+                    python3 -W ignore - "$PROJECT_ROOT/dev-tasks.json" "$TASK_ID" << 'PY'
 import json
-with open('dev-tasks.json', 'r') as f:
+import sys
+task_file, task_id = sys.argv[1], sys.argv[2]
+with open(task_file, 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data['tasks']:
-    if task['id'] == '$TASK_ID':
+    if task['id'] == task_id:
         task['status'] = 'ready_to_integrate'
         task['error_msg'] = None
         break
-with open('dev-tasks.json', 'w') as f:
-    json.dump(data, f, indent=2)
+with open(task_file, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
 PY
-                unlock
-                update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Task execution completed, ready for integrate"
-            else
-                lock
-                python3 -W ignore << PY
+                    unlock
+                    update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Task execution completed, ready for integrate"
+                elif [[ "$STATUS" == "FAILURE" ]]; then
+                    lock
+                    python3 -W ignore - "$PROJECT_ROOT/dev-tasks.json" "$TASK_ID" << 'PY'
 import json
-with open('dev-tasks.json', 'r') as f:
+import sys
+task_file, task_id = sys.argv[1], sys.argv[2]
+with open(task_file, 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data['tasks']:
-    if task['id'] == '$TASK_ID':
+    if task['id'] == task_id:
         task['error_count'] = task.get('error_count', 0) + 1
         task['error_msg'] = 'Worker execution failed'
         task['status'] = 'failed' if task['error_count'] >= 3 else 'error'
         break
-with open('dev-tasks.json', 'w') as f:
-    json.dump(data, f, indent=2)
+with open(task_file, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
 PY
-                unlock
-                release_task_lock "$TASK_ID"
-                update_agent_status "$WORKER_ID" "error" "$TASK_ID" "$TASK_TITLE" "Worker execution failed"
+                    unlock
+                    release_task_lock "$TASK_ID"
+                    update_agent_status "$WORKER_ID" "error" "$TASK_ID" "$TASK_TITLE" "Worker execution failed"
+                fi
             fi
-        ) >> "$PROJECT_ROOT/logs/w$WORKER_ID.log" 2>&1 &
+        ) &
         
         TASK_IDX=$((TASK_IDX + 1))
         
-        while [[ $(pgrep -fc "kimi.*--session=w") -ge $MAX_WORKERS ]]; do sleep 2; done
+        while [[ $(pgrep -fc "kimi$") -ge $MAX_WORKERS ]]; do sleep 2; done
         sleep 1
     done
 
@@ -790,6 +864,11 @@ PY
     
     if [[ $DONE -eq $TOTAL && $TOTAL -gt 0 ]]; then
         echo "[$(date '+%H:%M:%S')] All tasks completed!"
+        if [[ "$INF_MODE" == "1" ]]; then
+            echo "[$(date '+%H:%M:%S')] Infinite mode enabled. Waiting for new tasks..."
+            sleep 10
+            continue
+        fi
         break
     fi
 
