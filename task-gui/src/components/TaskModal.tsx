@@ -25,7 +25,7 @@ export function TaskModal({ isOpen, onClose, onSubmit }: TaskModalProps) {
       assigned_to: assignedTo === '' ? null : assignedTo,
       worktree: null,
       plan_mode: planMode,
-      work_branch: null,
+      work_branch: undefined,
     });
     onClose();
   };

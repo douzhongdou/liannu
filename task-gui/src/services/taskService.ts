@@ -1,38 +1,72 @@
 import type { TaskData, TaskLockData, Task } from '../types/task';
+import type { AgentStatusData } from '../types/agent';
+
+// API 基础 URL
+const API_BASE_URL = 'http://localhost:3000/api';
 
 export async function fetchTasks(): Promise<TaskData> {
-  console.log('[TaskService] Loading tasks from local file');
-  try {
-    // 使用fetch加载本地JSON文件
-    const response = await fetch('dev-tasks.json');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tasks: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log('[TaskService] Tasks loaded:', data.tasks?.length || 0);
-    return data;
-  } catch (err) {
-    console.error('[TaskService] Error loading tasks:', err);
-    // 返回默认数据结构
-    return { version: '1.0', tasks: [] };
+  console.log('[TaskService] Fetching tasks from API:', `${API_BASE_URL}/tasks`);
+  
+  const response = await fetch(`${API_BASE_URL}/tasks`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+  
+  const data = await response.json();
+  console.log('[TaskService] Tasks loaded:', data.tasks?.length || 0, 'tasks');
+  
+  if (!data.tasks || !Array.isArray(data.tasks)) {
+    throw new Error('Invalid tasks data format');
+  }
+  
+  return data;
 }
 
 export async function fetchLocks(): Promise<TaskLockData> {
-  console.log('[TaskService] Loading locks from local file');
-  try {
-    // 使用fetch加载本地JSON文件
-    const response = await fetch('dev-task.lock');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch locks: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log('[TaskService] Locks loaded:', data.locks?.length || 0);
-    return data;
-  } catch (err) {
-    console.error('[TaskService] Error loading locks:', err);
-    return { version: '1.0', locks: [] };
+  console.log('[TaskService] Fetching locks from API:', `${API_BASE_URL}/locks`);
+  
+  const response = await fetch(`${API_BASE_URL}/locks`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+  
+  const data = await response.json();
+  console.log('[TaskService] Locks loaded:', data.locks?.length || 0, 'locks');
+  
+  if (!data.locks || !Array.isArray(data.locks)) {
+    throw new Error('Invalid locks data format');
+  }
+  
+  return data;
+}
+
+export async function fetchAgents(): Promise<AgentStatusData> {
+  console.log('[TaskService] Fetching agents from API:', `${API_BASE_URL}/agents`);
+  
+  const response = await fetch(`${API_BASE_URL}/agents`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  console.log('[TaskService] Agents loaded:', Object.keys(data.workers || {}).length, 'workers');
+  
+  return data;
 }
 
 export function getLockedTaskIds(locks: TaskLockData): Set<string> {

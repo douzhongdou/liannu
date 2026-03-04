@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "\u521b\u5efa\u6570\u5b66\u5de5\u5177\u6a21\u5757",
+      "prompt": "\u521b\u5efa src/lib/math.js \u548c src/lib/math.test.js\uff1a\n1. \u5728 math.js \u4e2d\u5bfc\u51fa sum(numbers) \u4e0e average(numbers)\n2. sum \u652f\u6301\u6570\u5b57\u6570\u7ec4\u6c42\u548c\uff0caverage \u8fd4\u56de\u5e73\u5747\u503c\uff08\u7a7a\u6570\u7ec4\u8fd4\u56de 0\uff09\n3. \u5728 math.test.js \u5199\u6700\u5c0f\u53ef\u7528\u6d4b\u8bd5\uff08\u6b63\u5e38\u6570\u7ec4\u4e0e\u7a7a\u6570\u7ec4\uff09\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+      "completed_at": "2026-03-03T12:37:35Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T2",
+      "title": "\u521b\u5efa\u6587\u672c\u5de5\u5177\u6a21\u5757",
+      "prompt": "\u521b\u5efa src/lib/text.js \u548c src/lib/text.test.js\uff1a\n1. \u5728 text.js \u4e2d\u5bfc\u51fa toTitleCase(str) \u4e0e slugify(str)\n2. toTitleCase \u628a\u6bcf\u4e2a\u5355\u8bcd\u9996\u5b57\u6bcd\u5927\u5199\uff0cslugify \u8f6c\u5c0f\u5199\u5e76\u628a\u7a7a\u683c\u53d8\u6210\u4e2d\u5212\u7ebf\n3. \u5728 text.test.js \u5199\u6700\u5c0f\u53ef\u7528\u6d4b\u8bd5\uff08\u666e\u901a\u8f93\u5165\u4e0e\u7a7a\u5b57\u7b26\u4e32\uff09\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+      "completed_at": "2026-03-03T12:38:58Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T3",
+      "title": "\u521b\u5efa\u5feb\u901f\u4e0a\u624b\u6587\u6863",
+      "prompt": "\u521b\u5efa docs/quick-start.md\uff1a\n1. \u5199\u4e00\u4e2a\u7b80\u77ed\u6807\u9898\u548c\u7528\u9014\u8bf4\u660e\n2. \u7ed9\u51fa\u5982\u4f55\u4f7f\u7528 math.js \u4e0e text.js \u7684\u793a\u4f8b\u4ee3\u7801\u7247\u6bb5\n3. \u7ed9\u51fa\u5982\u4f55\u8fd0\u884c\u6d4b\u8bd5\u7684\u547d\u4ee4\u8bf4\u660e\n4. \u6587\u6863\u4e0d\u8d85\u8fc7 80 \u884c\uff0c\u5185\u5bb9\u6e05\u6670\u5373\u53ef\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+      "completed_at": "2026-03-03T12:40:23Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T4",
+      "title": "\u805a\u5408\u5bfc\u51fa\u5de5\u5177\u6a21\u5757",
+      "prompt": "\u57fa\u4e8e T1 \u548c T2 \u7684\u6210\u679c\uff1a\n1. \u521b\u5efa src/lib/index.js\uff0c\u7edf\u4e00\u5bfc\u51fa math.js \u548c text.js \u7684\u51fd\u6570\n2. \u521b\u5efa src/lib/index.test.js\uff0c\u81f3\u5c11\u9a8c\u8bc1\u4e00\u4e2a math \u51fd\u6570\u548c\u4e00\u4e2a text \u51fd\u6570\u53ef\u901a\u8fc7 index.js \u8c03\u7528\n3. \u4fdd\u6301\u5b9e\u73b0\u7b80\u6d01\uff0c\u4e0d\u505a\u590d\u6742\u5c01\u88c5\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [
+        "T1",
+        "T2"
+      ],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+      "completed_at": "2026-03-04T02:10:00Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T5",
+      "title": "\u521b\u5efa\u6f14\u793a\u5165\u53e3\u6587\u4ef6",
+      "prompt": "\u57fa\u4e8e T4 \u7684\u6210\u679c\uff1a\n1. \u521b\u5efa src/demo.js\n2. \u4ece src/lib/index.js \u5f15\u5165\u51fd\u6570\u5e76\u5199 3-5 \u884c\u6f14\u793a\u8c03\u7528\n3. \u8f93\u51fa\u7ed3\u679c\u7528 console.log \u5373\u53ef\uff0c\u4e0d\u9700\u8981\u547d\u4ee4\u884c\u53c2\u6570\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [
+        "T4"
+      ],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "2026-03-04T02:11:04Z",
+      "completed_at": "2026-03-04T02:12:11Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T6",
+      "title": "\u6700\u7ec8\u96c6\u6210\u9a8c\u8bc1\u4e0e\u8fdb\u5ea6\u8bb0\u5f55",
+      "prompt": "\u57fa\u4e8e T3 \u548c T5 \u7684\u6210\u679c\uff1a\n1. \u68c0\u67e5 docs/quick-start.md \u4e0e src/demo.js \u662f\u5426\u5b58\u5728\n2. \u5728 PROGRESS.md \u8ffd\u52a0\u4e00\u6bb5\u672c\u8f6e\u4efb\u52a1\u5b8c\u6210\u8bb0\u5f55\uff08\u5217\u51fa T1-T5\uff09\n3. \u8fd0\u884c\u6d4b\u8bd5\u5e76\u786e\u4fdd\u901a\u8fc7\n4. \u5982\u6709\u5931\u8d25\u5148\u4fee\u590d\u518d\u63d0\u4ea4\n\u5b8c\u6210\u540e\u63d0\u4ea4 git",
+      "status": "done",
+      "dependencies": [
+        "T3",
+        "T5"
+      ],
+      "assigned_to": "w1",
+      "worktree": null,
+      "plan_mode": true,
+      "started_at": "2026-03-04T02:12:43Z",
+      "completed_at": "2026-03-04T02:14:13Z",
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    }
+  ]
+}

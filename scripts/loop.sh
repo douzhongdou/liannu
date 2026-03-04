@@ -3,6 +3,9 @@
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
 mkdir -p logs
+LOG_FILE="$PROJECT_ROOT/logs/loop.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 STATUS_DIR="$PROJECT_ROOT/runtime-status"
 mkdir -p "$STATUS_DIR"
 CONFIG_FILE="${WORKFLOW_CONFIG_FILE:-$PROJECT_ROOT/config/workflow.env}"
@@ -48,6 +51,7 @@ echo "[$(date '+%H:%M:%S')] Ralph Loop started"
 
 LOCK_TABLE_FILE="$PROJECT_ROOT/dev-task.lock"
 LOCK_GUARD_FILE="$PROJECT_ROOT/dev-task.lock.guard"
+STATUS_FILE="$PROJECT_ROOT/agent-status.json"
 
 cleanup() {
     echo "[$(date '+%H:%M:%S')] Stopping..."
@@ -68,6 +72,78 @@ lock() {
 
 unlock() {
     rm -f "$LOCK_GUARD_FILE" 2>/dev/null || true
+}
+
+update_agent_status() {
+    local WORKER_ID="$1"
+    local STATUS="$2"
+    local TASK_ID="$3"
+    local TASK_TITLE="$4"
+    local MESSAGE="$5"
+    
+    lock
+    python3 -W ignore - "$STATUS_FILE" "$WORKER_ID" "$STATUS" "$TASK_ID" "$TASK_TITLE" "$MESSAGE" << 'PY'
+import json
+import sys
+import os
+from datetime import datetime, timezone
+
+status_file = sys.argv[1]
+worker_id = sys.argv[2]
+status = sys.argv[3]
+task_id = sys.argv[4] if sys.argv[4] and sys.argv[4] != "null" else None
+task_title = sys.argv[5] if sys.argv[5] and sys.argv[5] != "null" else None
+message = sys.argv[6]
+
+data = {}
+if os.path.exists(status_file):
+    try:
+        with open(status_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except:
+        pass
+
+if 'workers' not in data:
+    data['workers'] = {}
+if 'history' not in data:
+    data['history'] = []
+
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+data['updated_at'] = now
+
+worker_key = f"w{worker_id}"
+data['workers'][worker_key] = {
+    "status": status,
+    "current_task_id": task_id,
+    "current_task_title": task_title,
+    "message": message,
+    "updated_at": now
+}
+
+# Add history
+history_entry = {
+    "timestamp": now,
+    "worker": worker_key,
+    "event": status,
+    "task_id": task_id,
+    "detail": message
+}
+data['history'].insert(0, history_entry)
+data['history'] = data['history'][:50] # Keep last 50 entries
+
+with open(status_file, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+PY
+    unlock
+}
+
+# Update agent status JSON safely (duplicated function removed)
+
+init_agent_status() {
+    echo "{ \"updated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"workers\": {}, \"history\": [] }" > "$STATUS_FILE"
+    for i in $(seq 1 "$WORKER_COUNT"); do
+        update_agent_status "$i" "idle" "" "" "Worker initialized"
+    done
 }
 
 clean_worker_git_state() {
@@ -95,11 +171,12 @@ Rules:
 
 Task detail:
 $TASK_PROMPT" 2>/dev/null || true)
-    PLAN_OUTPUT="$PLAN_OUTPUT" TASK_PROMPT="$TASK_PROMPT" TASK_TITLE="$TASK_TITLE" python3 << 'PY'
+    PLAN_OUTPUT="$PLAN_OUTPUT" TASK_PROMPT="$TASK_PROMPT" TASK_TITLE="$TASK_TITLE" python3 -W ignore << 'PY'
 import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 
 text = (os.environ.get("PLAN_OUTPUT") or "").strip()
 task_prompt = (os.environ.get("TASK_PROMPT") or "").strip()
@@ -115,7 +192,10 @@ def normalize(path: str) -> str:
 def is_path_conflict(a: str, b: str) -> bool:
     if a == b:
         return True
-    return a.startswith(b + "/") or b.startswith(a + "/")
+    # 简单的目录包含检测
+    if a.startswith(b + "/") or b.startswith(a + "/"):
+        return True
+    return False
 
 def parse_obj(raw: str):
     raw = raw.strip()
@@ -177,7 +257,7 @@ PY
 }
 
 init_lock_table() {
-    python3 << PY
+    python3 -W ignore << PY
 import json
 import os
 
@@ -195,11 +275,14 @@ acquire_task_lock() {
     local RESULT=""
 
     lock
-    RESULT=$(python3 - "$LOCK_TABLE_FILE" "$TASK_ID" "$WORKER_NAME" "$TASK_LOCK_PATHS" << 'PY'
+    # Use temporary file to capture python output to avoid pipe issues
+    TMP_OUT=$(mktemp)
+    
+    python3 -W ignore - "$LOCK_TABLE_FILE" "$TASK_ID" "$WORKER_NAME" "$TASK_LOCK_PATHS" > "$TMP_OUT" 2>&1 << 'PY'
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 lock_file, task_id, worker_name, raw_paths = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
@@ -210,40 +293,52 @@ def normalize(path: str) -> str:
     value = value.strip("/")
     return value
 
+def is_path_conflict(a: str, b: str) -> bool:
+    if a == b: return True
+    return a.startswith(b + "/") or b.startswith(a + "/")
+
 if raw_paths:
     paths = [normalize(p) for p in raw_paths.split(";") if normalize(p)]
 else:
     paths = []
 
 if not paths:
+    # If no paths specified, default to global lock for safety
     paths = ["__global__"]
 
 if os.path.exists(lock_file):
-    with open(lock_file, "r", encoding="utf-8") as f:
-        content = f.read().strip()
-    if content:
-        data = json.loads(content)
-    else:
+    try:
+        with open(lock_file, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        data = json.loads(content) if content else {"version": "1.0", "locks": []}
+    except:
         data = {"version": "1.0", "locks": []}
 else:
     data = {"version": "1.0", "locks": []}
 
 locks = data.get("locks", [])
+# Remove stale locks for same task if any (e.g. from failed run)
 locks = [entry for entry in locks if entry.get("task_id") != task_id]
 
 request_set = set(paths)
 for entry in locks:
     existing_set = {normalize(p) for p in entry.get("paths", []) if normalize(p)}
-    if "__global__" in existing_set or "__global__" in request_set:
-        print(f"CONFLICT:{entry.get('task_id','unknown')}")
-        raise SystemExit(2)
+    
+    # Global lock conflict check
+    if "__global__" in existing_set:
+        print(f"CONFLICT:{entry.get('task_id','unknown')} (Global Lock Held)")
+        sys.exit(2)
+    if "__global__" in request_set:
+        print(f"CONFLICT:{entry.get('task_id','unknown')} (Requesting Global Lock)")
+        sys.exit(2)
+        
     for req in request_set:
         for ex in existing_set:
             if is_path_conflict(req, ex):
-                print(f"CONFLICT:{entry.get('task_id','unknown')}")
-                raise SystemExit(2)
+                print(f"CONFLICT:{entry.get('task_id','unknown')} (Path: {req} vs {ex})")
+                sys.exit(2)
 
-now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 locks.append({
     "task_id": task_id,
     "worker": worker_name,
@@ -258,8 +353,10 @@ with open(lock_file, "w", encoding="utf-8") as f:
 
 print("ACQUIRED")
 PY
-)
+    
     local EXIT_CODE=$?
+    RESULT=$(cat "$TMP_OUT")
+    rm -f "$TMP_OUT"
     unlock
 
     if [[ $EXIT_CODE -eq 0 ]]; then
@@ -273,7 +370,7 @@ PY
 release_task_lock() {
     local TASK_ID="$1"
     lock
-    python3 - "$LOCK_TABLE_FILE" "$TASK_ID" << 'PY'
+    python3 -W ignore - "$LOCK_TABLE_FILE" "$TASK_ID" << 'PY'
 import json
 import os
 import sys
@@ -302,10 +399,11 @@ PY
 
 MAX_WORKERS=3
 init_lock_table
+init_agent_status
 
 while true; do
     # ========== 集成已完成的任务（由 loop 统一调度） ==========
-    READY_TASKS=$(python3 << 'PY'
+    READY_TASKS=$(python3 -W ignore << 'PY'
 import json
 with open('dev-tasks.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
@@ -321,7 +419,9 @@ PY
         WORKER_DIR="$PROJECT_ROOT/../workers/w$READY_WORKER_ID"
         [[ -z "$TASK_WORK_BRANCH" ]] && TASK_WORK_BRANCH="worker-$READY_WORKER_ID"
         echo "[$(date '+%H:%M:%S')] Sync $TASK_ID from Worker $READY_WORKER_ID -> integrate"
+        update_agent_status "$READY_WORKER_ID" "integrating" "$TASK_ID" "" "Syncing code to integration branch" "sync"
         echo "[$(date '+%H:%M:%S')] Integrating $TASK_WORK_BRANCH -> $DEV_BRANCH..."
+        update_agent_status "$READY_WORKER_ID" "integrating" "$TASK_ID" "" "Merging to dev..."
         clean_worker_git_state "$WORKER_DIR"
         if git -C "$WORKER_DIR" fetch origin "$DEV_BRANCH" && \
            (git -C "$WORKER_DIR" fetch origin "$TASK_WORK_BRANCH" 2>/dev/null || true) && \
@@ -330,14 +430,15 @@ PY
                 git -C "$WORKER_DIR" push --force-with-lease origin "$TASK_WORK_BRANCH" || true
                 if git -C "$WORKER_DIR" push origin "$TASK_WORK_BRANCH:$DEV_BRANCH"; then
                     lock
-                    python3 << PY
+                    python3 -W ignore << PY
 import json
+from datetime import datetime, timezone
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'done'
-        task['completed_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+        task['completed_at'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         task['error_count'] = 0
         task['error_msg'] = None
         task['work_branch'] = None
@@ -348,6 +449,7 @@ PY
                     unlock
                     release_task_lock "$TASK_ID"
                     echo "[$(date '+%H:%M:%S')] Successfully integrated $TASK_WORK_BRANCH to $DEV_BRANCH"
+                    update_agent_status "$READY_WORKER_ID" "idle" "null" "null" "Task $TASK_ID integrated successfully" "completed"
                     if [[ "$TASK_WORK_BRANCH" == task/* ]]; then
                         git -C "$WORKER_DIR" checkout "worker-$READY_WORKER_ID" 2>/dev/null || git -C "$WORKER_DIR" checkout "$DEV_BRANCH" 2>/dev/null || true
                         git -C "$WORKER_DIR" branch -D "$TASK_WORK_BRANCH" 2>/dev/null || true
@@ -356,7 +458,7 @@ PY
                 else
                     echo "[$(date '+%H:%M:%S')] ERROR: Push $TASK_WORK_BRANCH to $DEV_BRANCH failed."
                     lock
-                    python3 << PY
+                    python3 -W ignore << PY
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -369,12 +471,13 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                     unlock
+                    update_agent_status "$READY_WORKER_ID" "error" "$TASK_ID" "" "Push failed"
                 fi
             else
                 echo "[$(date '+%H:%M:%S')] ERROR: Rebase conflict! Aborting rebase."
                 git -C "$WORKER_DIR" rebase --abort 2>/dev/null || true
                 lock
-                python3 << PY
+                python3 -W ignore << PY
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -387,11 +490,12 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                 unlock
+                update_agent_status "$READY_WORKER_ID" "error" "$TASK_ID" "" "Rebase conflict"
             fi
         else
             echo "[$(date '+%H:%M:%S')] ERROR: Task branch sync failed."
             lock
-            python3 << PY
+            python3 -W ignore << PY
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -404,6 +508,7 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
             unlock
+            update_agent_status "$READY_WORKER_ID" "error" "$TASK_ID" "" "Task branch sync failed"
         fi
     done <<< "$READY_TASKS"
     # =================================================
@@ -413,7 +518,7 @@ PY
     for i in $(seq 1 "$WORKER_COUNT"); do
         WORKER_DIR="$PROJECT_ROOT/../workers/w$i"
         RUNNING_PID=$(pgrep -f "kimi.*--session=w$i" | head -1 || true)
-        RUNNING_TASK_ID=$(python3 - "$i" << 'PY'
+        RUNNING_TASK_ID=$(python3 -W ignore - "$i" << 'PY'
 import json
 import sys
 
@@ -436,7 +541,7 @@ PY
         IDLE_WORKERS+=("$i")
     done
 
-    PENDING_TASKS=$(python3 << 'PY'
+    PENDING_TASKS=$(python3 -W ignore << 'PY'
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -458,6 +563,7 @@ PY
         echo "[$(date '+%H:%M:%S')] Assign $TASK_ID -> Worker $WORKER_ID"
         WORKER_DIR="$PROJECT_ROOT/../workers/w$WORKER_ID"
         TASK_WORK_BRANCH="task/${TASK_ID}-w${WORKER_ID}"
+        update_agent_status "$WORKER_ID" "planning" "$TASK_ID" "$TASK_TITLE" "Planning lock paths..."
         echo "[$(date '+%H:%M:%S')] Preparing task branch $TASK_WORK_BRANCH from $DEV_BRANCH..."
         clean_worker_git_state "$WORKER_DIR"
         
@@ -503,7 +609,7 @@ PY
             fi
         fi
         
-        TASK_PROMPT=$(python3 - "$TASK_ID" << 'PY'
+        TASK_PROMPT=$(python3 -W ignore - "$TASK_ID" << 'PY'
 import json
 import sys
 task_id = sys.argv[1]
@@ -516,10 +622,11 @@ for task in data.get('tasks', []):
 PY
 )
         PLANNED_LOCK_PATHS=""
+        # update_agent_status "$WORKER_ID" "planning" "$TASK_ID" "$TASK_TITLE" "Planning lock paths..." "planning"
         if ! PLANNED_LOCK_PATHS=$(plan_task_lock_paths "$WORKER_DIR" "$WORKER_ID" "$TASK_ID" "$TASK_TITLE" "$TASK_PROMPT"); then
             echo "[$(date '+%H:%M:%S')] Warning: Plan lock paths failed for $TASK_ID, skip assignment"
             lock
-            python3 - "$TASK_ID" << 'PY'
+            python3 -W ignore - "$TASK_ID" << 'PY'
 import json
 import sys
 task_id = sys.argv[1]
@@ -537,6 +644,7 @@ with open('dev-tasks.json', 'w', encoding='utf-8') as f:
 PY
             unlock
             TASK_IDX=$((TASK_IDX + 1))
+            update_agent_status "$WORKER_ID" "error" "$TASK_ID" "$TASK_TITLE" "Plan lock paths failed"
             continue
         fi
         if ! CONFLICT_REASON=$(acquire_task_lock "$TASK_ID" "w$WORKER_ID" "$PLANNED_LOCK_PATHS" 2>/dev/null); then
@@ -544,8 +652,9 @@ PY
                 CONFLICT_REASON="CONFLICT:unknown"
             fi
             echo "[$(date '+%H:%M:%S')] Skip $TASK_ID for Worker $WORKER_ID, $CONFLICT_REASON"
+            update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Skipped due to lock conflict: $CONFLICT_REASON"
             lock
-            python3 - "$TASK_ID" "$CONFLICT_REASON" << 'PY'
+            python3 -W ignore - "$TASK_ID" "$CONFLICT_REASON" << 'PY'
 import json
 import sys
 task_id = sys.argv[1]
@@ -564,15 +673,17 @@ with open('dev-tasks.json', 'w', encoding='utf-8') as f:
 PY
             unlock
             TASK_IDX=$((TASK_IDX + 1))
+            update_agent_status "$WORKER_ID" "idle" "null" "null" "Skipped $TASK_ID: $CONFLICT_REASON"
             continue
         fi
 
         git -C "$WORKER_DIR" push --force-with-lease origin "$TASK_WORK_BRANCH" 2>/dev/null || true
         
         lock
-        python3 - "$TASK_ID" "$WORKER_ID" "$TASK_WORK_BRANCH" << 'PY'
+        python3 -W ignore - "$TASK_ID" "$WORKER_ID" "$TASK_WORK_BRANCH" << 'PY'
 import json
 import sys
+from datetime import datetime, timezone
 
 task_id, worker_id, work_branch = sys.argv[1], sys.argv[2], sys.argv[3]
 with open('dev-tasks.json', 'r', encoding='utf-8') as f:
@@ -581,7 +692,7 @@ for task in data.get('tasks', []):
     if task.get('id') == task_id:
         task['status'] = 'running'
         task['assigned_to'] = f'w{worker_id}'
-        task['started_at'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+        task['started_at'] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         task['completed_at'] = None
         task['error_msg'] = None
         task['work_branch'] = work_branch
@@ -590,7 +701,17 @@ with open('dev-tasks.json', 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 PY
         unlock
+
+        update_agent_status "$WORKER_ID" "working" "$TASK_ID" "$TASK_TITLE" "Coding & Testing..."
         
+        export -f update_agent_status
+        export -f lock
+export -f unlock
+export PROJECT_ROOT
+export LOCK_GUARD_FILE
+export AGENT_STATUS_FILE
+export LOCK_TABLE_FILE
+
         (
             cd "$WORKER_DIR"
             if kimi --print --session=w$WORKER_ID -p "Task: $TASK_ID - $TASK_TITLE.
@@ -610,7 +731,7 @@ Execute the complete task lifecycle:
 
 Do not skip the git commit step."; then
                 lock
-                python3 << PY
+                python3 -W ignore << PY
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -623,9 +744,10 @@ with open('dev-tasks.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                 unlock
+                update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Task execution completed, ready for integrate"
             else
                 lock
-                python3 << PY
+                python3 -W ignore << PY
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)
@@ -640,6 +762,7 @@ with open('dev-tasks.json', 'w') as f:
 PY
                 unlock
                 release_task_lock "$TASK_ID"
+                update_agent_status "$WORKER_ID" "error" "$TASK_ID" "$TASK_TITLE" "Worker execution failed"
             fi
         ) >> "$PROJECT_ROOT/logs/w$WORKER_ID.log" 2>&1 &
         
@@ -649,7 +772,7 @@ PY
         sleep 1
     done
 
-    PROGRESS=$(python3 << 'PY'
+    PROGRESS=$(python3 -W ignore << 'PY'
 import json
 with open('dev-tasks.json', 'r') as f:
     data = json.load(f)

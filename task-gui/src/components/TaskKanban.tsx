@@ -1,5 +1,7 @@
-import type { Task, TaskLockData } from '../types/task';
+import type { Task, TaskLockData, TaskStatus } from '../types/task';
 import { statusLabels, statusColors } from '../types/task';
+import { getWorkerForTask } from '../services/taskService';
+import { Calendar, User, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface TaskKanbanProps {
   tasks: Task[];
@@ -7,66 +9,143 @@ interface TaskKanbanProps {
   onSelect: (taskId: string) => void;
 }
 
-const columns: { id: Task['status']; title: string }[] = [
-  { id: 'pending', title: '待处理' },
-  { id: 'running', title: '进行中' },
-  { id: 'ready_to_integrate', title: '待集成' },
-  { id: 'completed', title: '已完成' },
-  { id: 'failed', title: '失败' },
-];
+interface KanbanColumnProps {
+  status: TaskStatus;
+  tasks: Task[];
+  locks: TaskLockData;
+  onSelect: (taskId: string) => void;
+}
+
+// 默认颜色配置（用于未知状态）
+const defaultStatusColor = {
+  bg: 'bg-slate-100',
+  text: 'text-slate-600',
+  border: 'border-slate-200',
+  label: '未知'
+};
+
+// 格式化日期
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+const KanbanTaskCard = ({ task, locks, onSelect }: { task: Task; locks: TaskLockData; onSelect: (taskId: string) => void }) => {
+  const worker = getWorkerForTask(locks, task.id);
+  const statusColor = statusColors[task.status] || defaultStatusColor;
+
+  return (
+    <div
+      onClick={() => onSelect(task.id)}
+      className="bg-white rounded-lg border border-slate-200 p-3 cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 group"
+    >
+      {/* 任务标题 */}
+      <h3 className="font-medium text-slate-800 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors text-sm">
+        {task.title}
+      </h3>
+
+      {/* 任务描述预览 */}
+      <p className="text-xs text-slate-500 mb-2 line-clamp-2 leading-relaxed">
+        {task.prompt.split('\n')[0]}
+      </p>
+
+      {/* 状态标签 */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        <span className={`text-xs px-2 py-0.5 rounded ${statusColor.bg} ${statusColor.text} font-medium`}>
+          {statusLabels[task.status] || task.status}
+        </span>
+        {task.error_count > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-600 font-medium flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
+            {task.error_count}
+          </span>
+        )}
+        {worker && (
+          <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">
+            {worker}
+          </span>
+        )}
+      </div>
+
+      {/* 元信息 */}
+      <div className="flex flex-col gap-1 text-xs text-slate-400">
+        {/* 负责人 */}
+        <div className="flex items-center gap-1">
+          <User className="w-3 h-3" />
+          <span className="truncate">{task.assigned_to || '未分配'}</span>
+        </div>
+
+        {/* 时间信息 */}
+        <div className="flex items-center justify-between pt-1">
+          {task.started_at ? (
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span>{formatDate(task.started_at)}</span>
+            </div>
+          ) : (
+            <span>-</span>
+          )}
+
+          {task.completed_at && (
+            <div className="flex items-center gap-1 text-emerald-500">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>{formatDate(task.completed_at)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const KanbanColumn = ({ status, tasks, locks, onSelect }: KanbanColumnProps) => {
+  const colors = statusColors[status] || defaultStatusColor;
+
+  return (
+    <div className="flex flex-col">
+      {/* 列标题 */}
+      <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${colors.bg} border ${colors.border} mb-3`}>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold ${colors.text}`}>
+            {colors.label}
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-full bg-white/80 ${colors.text}`}>
+            {tasks.length}
+          </span>
+        </div>
+      </div>
+
+      {/* 任务卡片列表 */}
+      <div className="space-y-2">
+        {tasks.map((task) => (
+          <KanbanTaskCard key={task.id} task={task} locks={locks} onSelect={onSelect} />
+        ))}
+        {tasks.length === 0 && (
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center bg-slate-50/50">
+            <p className="text-xs text-slate-400">暂无任务</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export function TaskKanban({ tasks, locks, onSelect }: TaskKanbanProps) {
+  // 按状态分组任务
+  const columns: TaskStatus[] = ['pending', 'planning', 'running', 'ready_to_integrate', 'completed', 'failed'];
+
   return (
-    <div className="flex gap-6 overflow-x-auto pb-6">
-      {columns.map(column => {
-        const columnTasks = tasks.filter(t => t.status === column.id);
-        return (
-          <div key={column.id} className="min-w-[300px] flex-1">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold text-secondary-700 dark:text-secondary-300">{column.title}</h3>
-              <span className="text-xs text-secondary-500 dark:text-secondary-400 bg-secondary-100 dark:bg-secondary-700 px-3 py-1 rounded-full">
-                {columnTasks.length}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {columnTasks.map(task => {
-                const worker = locks.locks.find(l => l.task_id === task.id)?.worker;
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => onSelect(task.id)}
-                    className="bg-white dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 rounded-xl p-4 cursor-pointer hover:border-primary-500/50 transition-all hover:shadow-xl hover:shadow-primary-500/10"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <span className="text-xs font-mono text-secondary-500 dark:text-secondary-400 bg-secondary-100 dark:bg-secondary-700 px-2.5 py-1 rounded-lg">{task.id}</span>
-                      <span className={`text-xs px-3 py-1 rounded-full text-white font-medium ${statusColors[task.status]}`}>
-                        {statusLabels[task.status]}
-                      </span>
-                      {worker && (
-                        <span className="text-xs px-3 py-1 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 border border-accent-200 dark:border-accent-800 font-medium">
-                          {worker}
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="text-xs font-semibold text-secondary-900 dark:text-secondary-100 mb-2">{task.title}</h4>
-                    <p className="text-xs text-secondary-600 dark:text-secondary-400 line-clamp-2">{task.prompt}</p>
-                  </div>
-                );
-              })}
-              {columnTasks.length === 0 && (
-                <div className="border-2 border-dashed border-secondary-200 dark:border-secondary-700 rounded-xl p-8 text-center bg-secondary-50 dark:bg-secondary-700/50">
-                  <div className="w-12 h-12 bg-secondary-100 dark:bg-secondary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </div>
-                  <p className="text-xs text-secondary-500 dark:text-secondary-400">暂无任务</p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      {columns.map((status) => (
+        <KanbanColumn
+          key={status}
+          status={status}
+          tasks={tasks.filter(t => t.status === status)}
+          locks={locks}
+          onSelect={onSelect}
+        />
+      ))}
     </div>
   );
 }
