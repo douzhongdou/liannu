@@ -70,10 +70,10 @@ else
     echo "No workers directory found, skipping."
 fi
 
-# 3. Reset Task Status (dev-tasks.json)
+# 3. Reset Task Status (task.json)
 echo ""
-echo "[3/4] Resetting Task Status (dev-tasks.json)..."
-TASKS_FILE="$WORKFLOW_ROOT/dev-tasks.json"
+echo "[3/4] Resetting Task Status (task.json)..."
+TASKS_FILE="$WORKFLOW_ROOT/task.json"
 if [ -f "$TASKS_FILE" ]; then
     python3 - "$TASKS_FILE" << 'PY'
 import json
@@ -101,20 +101,20 @@ try:
             
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print("✅ dev-tasks.json reset to pending state.")
+    print("✅ task.json reset to pending state.")
 except Exception as e:
-    print(f"❌ Failed to reset dev-tasks.json: {e}")
+    print(f"❌ Failed to reset task.json: {e}")
 PY
 else
-    echo "dev-tasks.json not found."
+    echo "task.json not found."
 fi
 
 # 4. Clean Locks
 echo ""
 echo "[4/4] Cleaning Locks..."
-LOCK_FILE="$WORKFLOW_ROOT/dev-task.lock"
+LOCK_FILE="$WORKFLOW_ROOT/task.lock"
 echo '{"version": "1.0", "locks": []}' > "$LOCK_FILE"
-rm -f "$WORKFLOW_ROOT/dev-task.lock.guard"
+rm -f "$WORKFLOW_ROOT/task.lock.guard"
 echo "✅ Locks cleared."
 
 echo ""

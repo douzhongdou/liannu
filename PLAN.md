@@ -66,7 +66,7 @@ gui/
 │   │   ├── api.ts                 # 文件读取API封装（fetch with error handling）
 │   │   └── formatters.ts          # 时间、状态格式化
 │   └── App.tsx
-├── dev-tasks.json               # 源数据文件（项目根目录）
+├── task.json               # 源数据文件（项目根目录）
 ├── agent-status.json            # 源数据文件（项目根目录）
 └── vite.config.ts               # 配置server.fs.allow允许访问上级目录
 ```
@@ -84,7 +84,7 @@ server: {
 }
 ```
 
-**数据获取**: 通过`fetch('/dev-tasks.json')`读取，配合`usePolling`实现实时同步。
+**数据获取**: 通过`fetch('/task.json')`读取，配合`usePolling`实现实时同步。
 
 # 3. 数据结构定义
 
@@ -404,11 +404,11 @@ export default defineConfig({
 
 在项目根目录（gui的上级）放置：
 
-- `dev-tasks.json`（用户提供格式）
+- `task.json`（用户提供格式）
 
 - `agent-status.json`（用户提供格式）
 
-App内访问路径：`/dev-tasks.json`（通过Vite代理映射到上级目录）
+App内访问路径：`/task.json`（通过Vite代理映射到上级目录）
 
 ---
 

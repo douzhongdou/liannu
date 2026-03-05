@@ -3,14 +3,14 @@
 ## 1. 目录结构（同级设计）
 ~/workspace/
 ├── workflow/              # 中央控制塔（主仓库）
-│   ├── dev-tasks.json     # 任务队列真身（JSON 数据库）
+│   ├── task.json     # 任务队列真身（JSON 数据库）
 │   ├── loop.sh            # Ralph Loop 调度器
 │   ├── .lock/             # 文件锁（并发控制）
 │   └── logs/              # 集中日志
 │
 ├── agent-w1/              # Worker 1（Git Worktree）
 │   ├── .git/              # 指向 workflow/.git
-│   ├── dev-tasks.json -> ../workflow/dev-tasks.json  # Symlink（读写任务）
+│   ├── task.json -> ../workflow/task.json  # Symlink（读写任务）
 │   ├── STATUS.txt         # Worker 本地状态（idle/busy/done）
 │   └── AGENT.md           # Worker 行为指南
 │
@@ -29,7 +29,7 @@ plain
 
 ## 2. 核心组件
 
-### 2.1 中央状态文件（dev-tasks.json）
+### 2.1 中央状态文件（task.json）
 ```json
 {
   "tasks": [
@@ -52,16 +52,16 @@ done:T1 - T1 已完成（等待 Loop 回收）
 error:T1 - T1 失败（等待 Loop 处理）
 3. 通信机制
 3.1 单向数据流（Loop → Worker）
-Loop 写入 dev-tasks.json（标记任务为 running + 分配 Worker）
+Loop 写入 task.json（标记任务为 running + 分配 Worker）
 Loop 写入 ../agent-w1/STATUS.txt（busy:T1）
-Worker 通过 symlink 读取 ./dev-tasks.json（看到任务详情）
+Worker 通过 symlink 读取 ./task.json（看到任务详情）
 Worker 启动 Kimi Code 执行
 3.2 反向信号流（Worker → Loop）
 Worker 完成代码开发
 Worker 写入 ./STATUS.txt（done:T1 或 error:T1）
 Loop 轮询检测（每 5 秒检查所有 STATUS.txt）
 Loop 读取 done:T1 后：
-更新 dev-tasks.json（标记任务为 done）
+更新 task.json（标记任务为 done）
 重置 STATUS.txt（改为 idle）
 Worker 释放，可接新任务
 为什么 Worker 不直接写 JSON？
@@ -80,7 +80,7 @@ plain
 Phase 1: 任务分配（Loop 执行）
 bash
 复制
-1. Loop 读取 dev-tasks.json，找 pending 且依赖满足的任务
+1. Loop 读取 task.json，找 pending 且依赖满足的任务
 2. Loop 读取 agent-w*/STATUS.txt，找 idle 的 Worker
 3. Loop 原子更新 JSON: task.status = "running", task.assigned_to = "agent-w1"
 4. Loop 写入 STATUS: echo "busy:T1" > ../agent-w1/STATUS.txt
@@ -88,7 +88,7 @@ bash
 Phase 2: 任务执行（Worker 执行）
 bash
 复制
-1. Kimi 启动，读取 ./dev-tasks.json（通过 symlink）
+1. Kimi 启动，读取 ./task.json（通过 symlink）
 2. Kimi 看到 assigned_to 是自己的任务，开始执行
 3. Kimi 在当前目录写代码、运行测试、git commit
 4. 完成后，Kimi 写入: echo "done:T1" > STATUS.txt
@@ -138,7 +138,7 @@ Loop 排序：sorted(tasks, key=lambda x: (-x['priority'], x['created_at']))
 error_count 字段
 当 error_count >= 3 时标记为 failed，不再自动重试，人工介入
 7.4 Web GUI
-独立进程读取 dev-tasks.json（只读，不干扰 Loop）
+独立进程读取 task.json（只读，不干扰 Loop）
 WebSocket 实时推送状态变更
 8. 故障排查 Checklist
 表格
@@ -155,7 +155,7 @@ bash
 for i in {1..5}; do echo "w$i: $(cat ../agent-w$i/STATUS.txt)"; done
 
 # 查看任务队列
-cat dev-tasks.json | jq '.tasks[] | {id, status, assigned_to}'
+cat task.json | jq '.tasks[] | {id, status, assigned_to}'
 
 # 手动重置所有 Worker
 for i in {1..5}; do echo "idle" > ../agent-w$i/STATUS.txt; done

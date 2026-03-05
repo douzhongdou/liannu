@@ -21,8 +21,8 @@ CORS(app, resources={
 })
 
 # 数据文件路径（读取上级目录的数据文件）
-TASKS_FILE = os.path.join(os.path.dirname(__file__), "..", "dev-tasks.json")
-LOCK_FILE = os.path.join(os.path.dirname(__file__), "..", "dev-task.lock")
+TASKS_FILE = os.path.join(os.path.dirname(__file__), "..", "task.json")
+LOCK_FILE = os.path.join(os.path.dirname(__file__), "..", "task.lock")
 
 # 状态映射：后端状态 -> 前端状态
 STATUS_MAPPING = {

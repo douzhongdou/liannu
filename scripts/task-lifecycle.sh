@@ -14,7 +14,7 @@ case "$1" in
         
         python3 << PYEOF
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 
 raw_lock_paths = """$LOCK_PATHS_RAW"""
@@ -40,7 +40,7 @@ data['tasks'].append({
     "error_count": 0
 })
 
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 print(f"添加任务: $TASK_ID")
 PYEOF
@@ -50,7 +50,7 @@ PYEOF
         # 重置所有任务为pending（重新开始）
         python3 << 'PYEOF'
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 
 for t in data['tasks']:
@@ -61,17 +61,17 @@ for t in data['tasks']:
     t['completed_at'] = None
     t['error_count'] = 0
 
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 print("所有任务已重置为pending")
 PYEOF
-        cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+        cat > "$PROJECT_ROOT/task.lock" << 'EOF'
 {
   "version": "1.0",
   "locks": []
 }
 EOF
-        rm -f "$PROJECT_ROOT/dev-task.lock.guard"
+        rm -f "$PROJECT_ROOT/task.lock.guard"
         
         # 重置所有worker状态
         for i in {1..5}; do
@@ -87,7 +87,7 @@ EOF
 import json
 from datetime import datetime
 
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 
 print(f"{'ID':<8} {'Status':<10} {'Worker':<8} {'Title'}")
@@ -102,7 +102,7 @@ PYEOF
         # 重置失败/错误的任务为 pending，允许重试
         python3 << 'PYEOF'
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 
 reset_count = 0
@@ -115,17 +115,17 @@ for t in data['tasks']:
         t['completed_at'] = None
         reset_count += 1
 
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 print(f"已重置 {reset_count} 个失败任务为 pending")
 PYEOF
-        cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+        cat > "$PROJECT_ROOT/task.lock" << 'EOF'
 {
   "version": "1.0",
   "locks": []
 }
 EOF
-        rm -f "$PROJECT_ROOT/dev-task.lock.guard"
+        rm -f "$PROJECT_ROOT/task.lock.guard"
         
         # 重置所有 worker 状态
         for i in {1..5}; do

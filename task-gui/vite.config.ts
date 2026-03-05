@@ -7,8 +7,8 @@ import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 
 // 数据文件路径
-const TASKS_FILE = resolve(__dirname, '..', 'dev-tasks.json')
-const LOCK_FILE = resolve(__dirname, '..', 'dev-task.lock')
+const TASKS_FILE = resolve(__dirname, '..', 'task.json')
+const LOCK_FILE = resolve(__dirname, '..', 'task.lock')
 const AGENT_STATUS_FILE = resolve(__dirname, '..', 'agent-status.json')
 
 // CORS 响应头

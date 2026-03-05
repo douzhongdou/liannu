@@ -32,25 +32,113 @@ DEV_BRANCH="${DEV_BRANCH:-$PROJECT_MAIN_BRANCH}"
 
 export PATH="$HOME/.local/bin:$PATH"
 
-if ! command -v kimi &> /dev/null; then
-    echo "Error: kimi not found"
-    exit 1
+# LLM Provider configuration: kimi or claude
+LLM_PROVIDER="${LLM_PROVIDER:-kimi}"
+
+# LLM CLI wrapper function
+llm_call() {
+    local provider="$LLM_PROVIDER"
+    local session=""
+    local prompt=""
+    local yolo=0
+    local print_mode=0
+    local final_only=0
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --session=*)
+                session="${1#*=}"
+                shift
+                ;;
+            -p)
+                prompt="$2"
+                shift 2
+                ;;
+            --yolo)
+                yolo=1
+                shift
+                ;;
+            --print)
+                print_mode=1
+                shift
+                ;;
+            --final-message-only)
+                final_only=1
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ "$provider" == "claude" ]]; then
+        # Claude CLI doesn't have --yolo, uses non-interactive mode differently
+        local cmd="claude"
+        if [[ -n "$session" ]]; then
+            cmd="$cmd --session=\"$session\""
+        fi
+        if [[ "$print_mode" == "1" ]]; then
+            cmd="$cmd --print"
+        fi
+        if [[ "$final_only" == "1" ]]; then
+            cmd="$cmd --final-message-only"
+        fi
+        # For claude, --yolo equivalent is non-interactive with -p
+        cmd="$cmd -p \"$prompt\""
+        eval "$cmd"
+    else
+        # Kimi CLI
+        local cmd="kimi"
+        if [[ "$yolo" == "1" ]]; then
+            cmd="$cmd --yolo"
+        fi
+        if [[ -n "$session" ]]; then
+            cmd="$cmd --session=\"$session\""
+        fi
+        if [[ "$print_mode" == "1" ]]; then
+            cmd="$cmd --print"
+        fi
+        if [[ "$final_only" == "1" ]]; then
+            cmd="$cmd --final-message-only"
+        fi
+        cmd="$cmd -p \"$prompt\""
+        eval "$cmd"
+    fi
+}
+
+# Check LLM CLI availability
+if [[ "$LLM_PROVIDER" == "claude" ]]; then
+    if ! command -v claude &> /dev/null; then
+        echo "Error: claude not found"
+        exit 1
+    fi
+    AUTH_SOURCE="claude login session"
+else
+    if ! command -v kimi &> /dev/null; then
+        echo "Error: kimi not found"
+        exit 1
+    fi
+    AUTH_SOURCE="kimi login session"
 fi
 
 API_KEY_FILE="$PROJECT_ROOT/api-key.json"
 if [ -s "$API_KEY_FILE" ]; then
     AUTH_SOURCE="api-key.json"
-else
-    AUTH_SOURCE="kimi login session"
 fi
 
 STRICT_AUTH_CHECK="${STRICT_AUTH_CHECK:-0}"
 if [[ "$STRICT_AUTH_CHECK" == "1" ]]; then
-    if ! timeout 15 kimi --print --final-message-only -p "auth check" >/dev/null 2>&1; then
-        echo "Error: Kimi authentication check failed."
+    if ! timeout 15 llm_call --print --final-message-only -p "auth check" >/dev/null 2>&1; then
+        echo "Error: $LLM_PROVIDER authentication check failed."
         echo "Tried auth source: $AUTH_SOURCE"
         echo "Fix one of these and retry:"
-        echo "  1) Run: kimi login"
+        if [[ "$LLM_PROVIDER" == "claude" ]]; then
+            echo "  1) Run: claude login"
+        else
+            echo "  1) Run: kimi login"
+        fi
         echo "  2) Or provide non-empty: $API_KEY_FILE"
         exit 1
     fi
@@ -58,8 +146,8 @@ fi
 
 echo "[$(date '+%H:%M:%S')] Ralph Loop started"
 
-LOCK_TABLE_FILE="$PROJECT_ROOT/dev-task.lock"
-LOCK_GUARD_FILE="$PROJECT_ROOT/dev-task.lock.guard"
+LOCK_TABLE_FILE="$PROJECT_ROOT/task.lock"
+LOCK_GUARD_FILE="$PROJECT_ROOT/task.lock.guard"
 STATUS_FILE="$PROJECT_ROOT/agent-status.json"
 
 
@@ -466,7 +554,7 @@ while true; do
     # ========== 集成已完成的任务（由 loop 统一调度） ==========
     READY_TASKS=$(python3 -W ignore << 'PY'
 import json
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+with open('task.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
     if task.get('status') == 'ready_to_integrate':
@@ -494,7 +582,7 @@ PY
                     python3 -W ignore << PY
 import json
 from datetime import datetime, timezone
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
@@ -504,7 +592,7 @@ for task in data['tasks']:
         task['error_msg'] = None
         task['work_branch'] = None
         break
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                     unlock
@@ -521,14 +609,14 @@ PY
                     lock
                     python3 -W ignore << PY
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'error'
         task['error_msg'] = 'Push task branch to integration branch failed'
         break
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                     unlock
@@ -540,14 +628,14 @@ PY
                 lock
                 python3 -W ignore << PY
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'error'
         task['error_msg'] = 'Rebase conflict to integration branch'
         break
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
                 unlock
@@ -558,14 +646,14 @@ PY
             lock
             python3 -W ignore << PY
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 for task in data['tasks']:
     if task['id'] == '$TASK_ID':
         task['status'] = 'error'
         task['error_msg'] = 'Task branch sync failed'
         break
-with open('dev-tasks.json', 'w') as f:
+with open('task.json', 'w') as f:
     json.dump(data, f, indent=2)
 PY
             unlock
@@ -588,7 +676,7 @@ import json
 import sys
 
 worker = f"w{sys.argv[1]}"
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+with open('task.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
     if task.get('status') in ('running', 'ready_to_integrate') and task.get('assigned_to') == worker:
@@ -608,7 +696,7 @@ PY
 
     PENDING_TASKS=$(python3 -W ignore << 'PY'
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 done_ids = {t['id'] for t in data['tasks'] if t['status'] == 'done'}
 for task in data['tasks']:
@@ -678,7 +766,7 @@ PY
 import json
 import sys
 task_id = sys.argv[1]
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+with open('task.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
     if task.get('id') == task_id:
@@ -695,7 +783,7 @@ PY
 import json
 import sys
 task_id = sys.argv[1]
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+with open('task.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
     if task.get('id') == task_id:
@@ -704,7 +792,7 @@ for task in data.get('tasks', []):
         task['started_at'] = None
         task['error_msg'] = 'Plan lock paths failed'
         break
-with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+with open('task.json', 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 PY
             unlock
@@ -725,7 +813,7 @@ import sys
 from datetime import datetime, timezone
 
 task_id, worker_id, work_branch = sys.argv[1], sys.argv[2], sys.argv[3]
-with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+with open('task.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 for task in data.get('tasks', []):
     if task.get('id') == task_id:
@@ -736,7 +824,7 @@ for task in data.get('tasks', []):
         task['error_msg'] = None
         task['work_branch'] = work_branch
         break
-with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+with open('task.json', 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 PY
         unlock
@@ -761,7 +849,7 @@ export LOCK_TABLE_FILE
             record_worker_session "$WORKER_ID" "$SESSION_ID" "$TASK_ID"
             
             # 启动 Worker，使用 UUID 作为 session 名
-            if kimi --yolo --session="$SESSION_ID" -p "Task: $TASK_ID - $TASK_TITLE.
+            if llm_call --yolo --session="$SESSION_ID" -p "Task: $TASK_ID - $TASK_TITLE.
 Current task branch: $TASK_WORK_BRANCH.
 Do not switch branches.
 
@@ -774,7 +862,7 @@ If your task requires modifying these files, you MUST:
 2. Before pushing, perform a 'git pull --rebase origin dev' to sync latest changes.
 3. Resolve any merge conflicts autonomously.
 
-Then read dev-tasks.json for task details.
+Then read task.json for task details.
 
 Execute the complete task lifecycle:
 1. Plan (if complex)
@@ -800,7 +888,7 @@ Do not skip the git commit step."; then
                 rm -f "$STATUS_FILE"
                 if [[ "$STATUS" == "SUCCESS" ]]; then
                     lock
-                    python3 -W ignore - "$PROJECT_ROOT/dev-tasks.json" "$TASK_ID" << 'PY'
+                    python3 -W ignore - "$PROJECT_ROOT/task.json" "$TASK_ID" << 'PY'
 import json
 import sys
 task_file, task_id = sys.argv[1], sys.argv[2]
@@ -818,7 +906,7 @@ PY
                     update_agent_status "$WORKER_ID" "idle" "$TASK_ID" "$TASK_TITLE" "Task execution completed, ready for integrate"
                 elif [[ "$STATUS" == "FAILURE" ]]; then
                     lock
-                    python3 -W ignore - "$PROJECT_ROOT/dev-tasks.json" "$TASK_ID" << 'PY'
+                    python3 -W ignore - "$PROJECT_ROOT/task.json" "$TASK_ID" << 'PY'
 import json
 import sys
 task_file, task_id = sys.argv[1], sys.argv[2]
@@ -842,13 +930,13 @@ PY
         
         TASK_IDX=$((TASK_IDX + 1))
         
-        while [[ $(pgrep -fc "kimi$") -ge $MAX_WORKERS ]]; do sleep 2; done
+        while [[ $(pgrep -fc "${LLM_PROVIDER}$") -ge $MAX_WORKERS ]]; do sleep 2; done
         sleep 1
     done
 
     PROGRESS=$(python3 -W ignore << 'PY'
 import json
-with open('dev-tasks.json', 'r') as f:
+with open('task.json', 'r') as f:
     data = json.load(f)
 tasks = data.get('tasks', [])
 total = len(tasks)

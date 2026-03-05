@@ -23,7 +23,7 @@ echo "📋 任务概览:"
 python3 << 'PYEOF'
 import json
 try:
-    with open('dev-tasks.json', 'r') as f:
+    with open('task.json', 'r') as f:
         data = json.load(f)
     tasks = data.get('tasks', [])
     total = len(tasks)

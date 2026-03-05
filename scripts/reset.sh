@@ -72,7 +72,7 @@ import json
 from datetime import datetime
 
 try:
-    with open('dev-tasks.json', 'r', encoding='utf-8') as f:
+    with open('task.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
     
     # 重置所有任务状态
@@ -87,7 +87,7 @@ try:
         task['work_branch'] = None
         # 保留: id, title, prompt, dependencies, plan_mode
     
-    with open('dev-tasks.json', 'w', encoding='utf-8') as f:
+    with open('task.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     
     print(f"  ✓ 已重置 {len(data.get('tasks', []))} 个任务状态")
@@ -106,13 +106,13 @@ for i in $(seq 1 "$WORKER_COUNT"); do
 done
 
 echo "[6/6] 重置锁表..."
-cat > "$PROJECT_ROOT/dev-task.lock" << 'EOF'
+cat > "$PROJECT_ROOT/task.lock" << 'EOF'
 {
   "version": "1.0",
   "locks": []
 }
 EOF
-rm -f "$PROJECT_ROOT/dev-task.lock.guard"
+rm -f "$PROJECT_ROOT/task.lock.guard"
 
 echo ""
 echo "========================================="

@@ -22,8 +22,8 @@ WORKER_COUNT="${WORKER_COUNT:-5}"
 mkdir -p "$WORKFLOW_ROOT/tasks" "$WORKFLOW_ROOT/state" "$WORKFLOW_ROOT/logs" "$WORKFLOW_ROOT/runtime"
 mkdir -p "$WORKERS_ROOT"
 
-if [ ! -f "$WORKFLOW_ROOT/dev-task.lock" ]; then
-cat > "$WORKFLOW_ROOT/dev-task.lock" << 'EOF'
+if [ ! -f "$WORKFLOW_ROOT/task.lock" ]; then
+cat > "$WORKFLOW_ROOT/task.lock" << 'EOF'
 {
   "version": "1.0",
   "locks": []
@@ -31,8 +31,8 @@ cat > "$WORKFLOW_ROOT/dev-task.lock" << 'EOF'
 EOF
 fi
 
-if [ ! -f "$WORKFLOW_ROOT/dev-tasks.json" ]; then
-cat > "$WORKFLOW_ROOT/dev-tasks.json" << 'EOF'
+if [ ! -f "$WORKFLOW_ROOT/task.json" ]; then
+cat > "$WORKFLOW_ROOT/task.json" << 'EOF'
 {
   "version": "1.0",
   "tasks": []
@@ -83,8 +83,8 @@ for i in $(seq 1 "$WORKER_COUNT"); do
         git -C "$PROJECT_REPO" worktree add "$WORKER_DIR" "$WORKER_BRANCH"
     fi
 
-    ln -sf "../../workflow/dev-tasks.json" "$WORKER_DIR/dev-tasks.json"
-    ln -sf "../../workflow/dev-task.lock" "$WORKER_DIR/dev-task.lock"
+    ln -sf "../../workflow/task.json" "$WORKER_DIR/task.json"
+    ln -sf "../../workflow/task.lock" "$WORKER_DIR/task.lock"
     [ -f "$WORKFLOW_ROOT/api-key.json" ] && ln -sf "../../workflow/api-key.json" "$WORKER_DIR/api-key.json"
     ln -sf "../../workflow/AGENT.md" "$WORKER_DIR/AGENT.md"
     ln -sf "../../workflow/PLAN.md" "$WORKER_DIR/PLAN.md"

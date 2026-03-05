@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "示例任务 - 初始化项目",
+      "prompt": "这是一个示例任务描述。\n请完成以下工作：\n1. 创建项目基础结构\n2. 配置必要文件\n3. 确保测试通过\n完成后提交 git",
+      "status": "pending",
+      "dependencies": [],
+      "assigned_to": null,
+      "plan_mode": true,
+      "started_at": null,
+      "completed_at": null,
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    },
+    {
+      "id": "T2",
+      "title": "示例任务 - 实现核心功能",
+      "prompt": "基于 T1 的成果，实现核心功能模块。\n要求：\n1. 编写主要业务逻辑\n2. 添加单元测试\n3. 更新文档\n完成后提交 git",
+      "status": "pending",
+      "dependencies": ["T1"],
+      "assigned_to": null,
+      "plan_mode": true,
+      "started_at": null,
+      "completed_at": null,
+      "error_count": 0,
+      "error_msg": null,
+      "work_branch": null
+    }
+  ]
+}

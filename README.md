@@ -17,8 +17,8 @@
 核心原则：
 
 1. **调度与执行解耦**：调度逻辑在 `workflow/`，代码开发在 `workers/w*`
-2. **状态统一管理**：使用 `dev-tasks.json` 和 `agent-status.json` 管理状态
-3. **乐观锁机制**：Agent 在执行前动态规划文件锁 (`dev-task.lock`)，调度器仅做冲突预警，Agent 自主解决 Git 冲突
+2. **状态统一管理**：使用 `task.json` 和 `agent-status.json` 管理状态
+3. **乐观锁机制**：Agent 在执行前动态规划文件锁 (`task.lock`)，调度器仅做冲突预警，Agent 自主解决 Git 冲突
 4. **非阻塞通信**：Worker 与 Scheduler 通过状态文件异步通信，避免管道阻塞
 
 ## 目录结构
@@ -26,9 +26,12 @@
 ```text
 dir/
 ├─ workflow/
-│  ├─ config/workflow.env      # 配置文件
-│  ├─ dev-tasks.json           # 任务列表与状态
-│  ├─ dev-task.lock            # 动态文件锁
+│  ├─ config/
+│  │  └─ example-workflow.env  # 配置示例（改名为 workflow.env 使用）
+│  ├─ example-task.json        # 任务列表示例
+│  ├─ example-task.lock        # 文件锁示例
+│  ├─ task.json                # 本地任务列表（gitignored）
+│  ├─ tasks.lock               # 本地文件锁（gitignored）
 │  ├─ agent-status.json        # Agent 实时状态监控
 │  ├─ AGENT.md                 # Agent 操作指南
 │  ├─ PLAN.md                  # 待开发项目的规划文档
@@ -46,9 +49,34 @@ dir/
    └─ ...
 ```
 
+## 环境准备
+
+本项目采用「示例文件 + 本地配置」模式，便于开源协作同时保护私有配置：
+
+| 文件类型 | 示例文件 | 本地使用 | 说明 |
+|---------|---------|---------|------|
+| 配置文件 | `config/example-workflow.env` | `config/workflow.env` | 工作流配置 |
+| 任务列表 | `example-task.json` | `task.json` | 定义开发任务 |
+| 文件锁 | `example-task.lock` | `tasks.lock` | 运行时自动生成 |
+
+**快速准备：**
+```bash
+# 1. 复制配置文件
+cp config/example-workflow.env config/workflow.env
+
+# 2. 复制任务文件
+cp example-task.json task.json
+cp example-task.lock tasks.lock
+
+# 3. 编辑你自己的配置
+code config/workflow.env
+```
+
+---
+
 ## 配置说明
 
-在使用前，请先配置 `config/workflow.env` 文件：
+在使用前，请先编辑 `config/workflow.env` 文件：
 
 ```bash
 # 工作流仓库的远程地址（用于同步调度逻辑）
@@ -73,11 +101,27 @@ WORKER_COUNT=5
 | `PROJECT_MAIN_BRANCH` | 项目主分支名称 | `main` 或 `master` |
 | `WORKER_COUNT` | 并行 Worker 数量 | `3` ~ `10` |
 
-## 安装[kimicode](https://www.kimi.com/code)
+## 选择 LLM 提供商
 
-本项目使用了[kimicode](https://www.kimi.com/code)作为代码生成器。请确保在使用前已经安装了[kimicode](https://www.kimi.com/code)。
-要先login，然后工作流才可以自动执行。
-其他工具在开发中。
+支持通过环境变量切换 LLM：
+
+```bash
+# 使用 Kimi（默认）
+bash scripts/loop.sh
+
+# 使用 Claude
+LLM_PROVIDER=claude bash scripts/loop.sh
+
+# 或在 workflow.env 中设置
+# LLM_PROVIDER=claude
+```
+
+## 安装 CLI 工具
+
+- **Kimi**: 安装 [Kimi Code CLI](https://www.kimi.com/code)，执行 `kimi login`
+- **Claude**: 安装 Claude Code CLI，执行 `claude login`
+
+确保对应 CLI 已安装并登录，工作流才能自动执行。
 
 ## 快速开始
 
@@ -98,7 +142,7 @@ bash scripts/loop.sh
 bash scripts/loop.sh --inf
 ```
 启动后，调度器会：
-- 自动读取 `dev-tasks.json`
+- 自动读取 `task.json`
 - 动态规划文件锁
 - 分配任务给空闲 Worker
 - 自动合并完成的代码到 dev 分支
@@ -106,7 +150,7 @@ bash scripts/loop.sh --inf
 ### 3) 监控状态
 
 - **实时看板**: 查看 `agent-status.json`（或使用 GUI Dashboard）
-- **任务进度**: 查看 `dev-tasks.json`
+- **任务进度**: 查看 `task.json`
 - **详细日志**: `tail -f logs/loop.log` 或 `logs/w*.log`
 
 ### 4) 启动 GUI Dashboard (可选)
@@ -122,14 +166,14 @@ npm run dev
 
 ## 任务开发流程
 
-1. **定义任务**: 在 `dev-tasks.json` 中定义任务，支持 `dependencies` 设置依赖。
+1. **定义任务**: 在 `task.json` 中定义任务，支持 `dependencies` 设置依赖。
 2. **自动规划**: 任务开始时，Agent 会分析 Prompt 并规划需要修改的文件。
 3. **乐观锁并发**: 调度器记录文件锁并预警冲突，但不强制阻塞；Agent 需自主处理 Git Rebase 冲突。
 4. **自动集成**: 任务完成后，Loop 会自动将代码 Merge/Rebase 回主分支。
 
 ## 关键文件说明
 
-- **`dev-tasks.json`**: 任务的单一数据源。
+- **`task.json`**: 任务的单一数据源。
 - **`agent-status.json`**: 记录 Worker 的当前动作（Planning, Working, Idle）和历史操作日志。
 - **`PLAN.md`**: 全局技术规划，所有 Agent 都会参考此文件。
 - **`AGENT.md`**: Agent 的行为准则和操作手册。
@@ -137,7 +181,7 @@ npm run dev
 ## 常见问题
 
 **Q: 如何处理文件冲突？**  
-A: 本系统采用乐观锁机制。当多个 Worker 尝试修改同一文件时，调度器会在 `dev-task.lock` 中标记冲突，并在日志中预警。Agent 需要自主执行 `git rebase` 解决冲突。
+A: 本系统采用乐观锁机制。当多个 Worker 尝试修改同一文件时，调度器会在 `task.lock` 中标记冲突，并在日志中预警。Agent 需要自主执行 `git rebase` 解决冲突。
 
 **Q: Worker 崩溃了怎么办？**  
 A: 调度器会定期检测 Worker 心跳。若 Worker 异常退出，其持有的文件锁会自动释放，任务会重新进入待分配队列。

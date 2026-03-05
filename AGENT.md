@@ -19,7 +19,7 @@
 ## 二、任务生命周期（严格执行）
 
 ### Phase 1: 领取任务
-- 读取当前目录的 `dev-tasks.json`（通过 Symlink）
+- 读取当前目录的 `task.json`（通过 Symlink）
 - 找到状态为 `assigned_to: $HOSTNAME` 且 `status: running` 的任务
 - 读取任务详情到内存
 
@@ -34,7 +34,7 @@
 **重要：你的 worktree 已经包含了 dev 分支的最新代码**
 - Loop 在分配任务前，已经将 dev 的最新代码合并到了你的 worker 分支
 - **你必须在现有代码基础上开发**，不要删除或覆盖其他人的工作
-- 如果有依赖的其他任务（查看 dev-tasks.json 的 dependencies），它们的代码已经合并到了 dev，所以你现在的代码库是完整的
+- 如果有依赖的其他任务（查看 task.json 的 dependencies），它们的代码已经合并到了 dev，所以你现在的代码库是完整的
 
 **开发规范：**
 - 在 worktree 内开发（**不要**修改主仓库文件）
@@ -190,18 +190,18 @@ error     → 任务失败
 
 ### 与 Loop 的通信流程
 ```
-Loop → dev-tasks.json (写入: status=running, assigned_to=w1)
+Loop → task.json (写入: status=running, assigned_to=w1)
 Loop → agent-status.json (写入: status=working)
-Worker → dev-tasks.json (读取: 通过 Symlink 查看任务详情)
+Worker → task.json (读取: 通过 Symlink 查看任务详情)
 Worker → Git (提交代码并 Push)
 Loop → 检测到 Worker 进程退出
 Loop → Git (合并代码到 dev)
-Loop → dev-tasks.json (写入: status=done)
+Loop → task.json (写入: status=done)
 Loop → agent-status.json (写入: status=idle)
 ```
 
 **重要**: 
-1. Worker 只读 dev-tasks.json，不要直接修改 dev-tasks.json！
+1. Worker 只读 task.json，不要直接修改 task.json！
 2. 状态流转由 Loop 统一接管。
 
 ---
@@ -267,7 +267,7 @@ Loop → agent-status.json (写入: status=idle)
 ❌ 直接编辑本地的 `PROGRESS.md`（要求git -C里修改）  
 ❌ 使用 any 类型（TypeScript 严格模式）  
 ❌ 留下 TODO 注释（必须完成或转为任务）  
-❌ 直接写入 dev-tasks.json（Worker 只读，Loop 唯一写入者）
+❌ 直接写入 task.json（Worker 只读，Loop 唯一写入者）
 
 ---
 

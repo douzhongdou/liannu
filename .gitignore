@@ -1,4 +1,6 @@
 /logs
 /task-gui/node_modules
 /config/workflow.env
+/task.json
+/tasks.lock
 #把logs文件夹忽略
